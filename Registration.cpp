@@ -21,6 +21,9 @@
 #include <Suscan/Library.h>
 #include <QCoreApplication>
 #include "AD9361SourcePageFactory.h"
+#include "PhaseComparatorFactory.h"
+#include "PhasePlotPageFactory.h"
+
 #include "2rx_ad9361.h"
 
 SUSCAN_PLUGIN("AntSDRPlugin", "AntSDR plugin for coherent RX");
@@ -38,7 +41,17 @@ plugin_load(Suscan::Plugin *plugin)
 {
   Suscan::Singleton *sus = Suscan::Singleton::get_instance();
   
-  sus->registerSourceConfigWidgetFactory(new AD9361SourcePageFactory(plugin));
+  if (!sus->registerSourceConfigWidgetFactory(
+        new AD9361SourcePageFactory(plugin)))
+    return false;
+
+  if (!sus->registerToolWidgetFactory(
+        new SigDigger::PhaseComparatorFactory(plugin)))
+    return false;
+
+  if (!sus->registerTabWidgetFactory(
+        new SigDigger::PhasePlotPageFactory(plugin)))
+    return false;
 
   sus->registerDelayedCallback(plugin_delayed_load, plugin);
 

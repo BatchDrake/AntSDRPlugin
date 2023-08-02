@@ -38,11 +38,23 @@ target.path = $$PLUGIN_DIRECTORY
 SOURCES += Registration.cpp \
   AD9361SourcePage.cpp \
   AD9361SourcePageFactory.cpp \
-  2rx_ad9361.c
+  2rx_ad9361.c \
+  PhaseComparator.cpp \
+  PhaseComparatorFactory.cpp \
+  PhasePlotPage.cpp \
+  PhasePlotPageFactory.cpp \
+  RawChannelForwarder.cpp \
+  SimplePhaseComparator.cpp
 
 HEADERS += 2rx_ad9361.h \
   AD9361SourcePage.h \
-  AD9361SourcePageFactory.h
+  AD9361SourcePageFactory.h \
+  PhaseComparator.h \
+  PhaseComparatorFactory.h \
+  PhasePlotPage.h \
+  PhasePlotPageFactory.h \
+  RawChannelForwarder.h \
+  SimplePhaseComparator.h
 
 INCLUDEPATH += $$SUWIDGETS_INSTALL_HEADERS $$SIGDIGGER_INSTALL_HEADERS
 
@@ -52,5 +64,7 @@ unix: PKGCONFIG += suscan sigutils fftw3 sndfile libiio libad9361
 CONFIG += c++11
 
 FORMS += \
-  AD9361SourcePage.ui
+  AD9361SourcePage.ui \
+  PhaseComparator.ui \
+  PhasePlotPage.ui
 

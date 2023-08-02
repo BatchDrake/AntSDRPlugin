@@ -513,7 +513,7 @@ SUPRIVATE struct suscan_source_interface g_ad9361_source =
 {
   .name            = "ad9361",
   .desc            = "Pluto/ANTSDR 2RX combined source",
-  .realtime        = SU_FALSE,
+  .realtime        = SU_TRUE,
 
   .open            = suscan_source_ad9361_open,
   .close           = suscan_source_ad9361_close,

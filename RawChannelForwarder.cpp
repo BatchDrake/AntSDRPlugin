@@ -156,7 +156,7 @@ RawChannelForwarder::openChannel()
   ch.fLow  = -.5 * m_desiredBandwidth;
   ch.fHigh = +.5 * m_desiredBandwidth;
 
-  if (!m_tracker->requestOpen("raw", ch))
+  if (!m_tracker->requestOpen("raw", ch, QVariant(), false))
     return false;
 
   this->setState(RAW_CHANNEL_FORWARDER_OPENING, "Opening inspector...");
