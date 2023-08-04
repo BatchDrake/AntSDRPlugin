@@ -53,16 +53,24 @@ PhasePlotPage::PhasePlotPage(
   ui->waveform->setAutoFitToEnvelope(true);
   ui->waveform->setData(&m_data);
   ui->waveform->setAutoScroll(true);
+
+  ui->phaseView->setHistorySize(100);
 }
 
 
 void
 PhasePlotPage::feed(const SUCOMPLEX *data, SUSCOUNT size)
 {
+  for (SUSCOUNT i = 0; i < size; ++i)
+    m_accumulated += data[i];
+  m_accumCount += size;
+
   m_data.insert(m_data.end(), data, data + size);
 
   if (m_paramsSet)
     ui->waveform->refreshData();
+
+   ui->phaseView->feed(data, size);
 }
 
 void
@@ -105,6 +113,25 @@ void
 PhasePlotPage::applyConfig(void)
 {
   // NO-OP
+}
+
+void
+PhasePlotPage::setTimeStamp(struct timeval const &)
+{
+  if (m_accumCount > 0) {
+    SUFLOAT mag;
+    m_accumulated /= m_accumCount;
+    mag = SU_C_ABS(m_accumulated);
+    if (mag > m_max) {
+      m_max = mag;
+      ui->phaseView->setGain(1 / m_max);
+    } else {
+      SU_SPLPF_FEED(m_max, 10 * mag, 1e-2);
+      if (m_max > std::numeric_limits<SUFLOAT>::epsilon())
+        ui->phaseView->setGain(1 / m_max);
+    }
+    m_accumCount = 0;
+  }
 }
 
 PhasePlotPage::~PhasePlotPage()

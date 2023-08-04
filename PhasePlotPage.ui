@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>759</width>
+    <height>339</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,6 +15,35 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
+    <widget class="PhaseView" name="phaseView">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>128</width>
+       <height>128</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>128</width>
+       <height>128</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Phase plot</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="2">
     <widget class="Waveform" name="waveform"/>
    </item>
   </layout>
@@ -24,6 +53,11 @@
    <class>Waveform</class>
    <extends>QFrame</extends>
    <header>Waveform.h</header>
+  </customwidget>
+  <customwidget>
+   <class>PhaseView</class>
+   <extends>QFrame</extends>
+   <header>PhaseView.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

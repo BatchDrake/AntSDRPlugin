@@ -44,6 +44,9 @@ namespace SigDigger {
     PhasePlotPageConfig *m_config = nullptr;
 
     std::vector<SUCOMPLEX> m_data;
+    SUCOMPLEX m_accumulated;
+    SUSCOUNT  m_accumCount = 0;
+    SUFLOAT   m_max = 0;
 
   public:
     explicit PhasePlotPage(
@@ -62,6 +65,7 @@ namespace SigDigger {
 
     virtual Suscan::Serializable *allocConfig(void) override;
     virtual void applyConfig(void) override;
+    virtual void setTimeStamp(struct timeval const &) override;
 
   private:
     Ui::PhasePlotPage *ui;
