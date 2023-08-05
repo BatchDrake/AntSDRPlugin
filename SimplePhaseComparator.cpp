@@ -165,6 +165,12 @@ SimplePhaseComparator::setFrequency(qreal freq)
 }
 
 qreal
+SimplePhaseComparator::getFrequency() const
+{
+  return m_desiredFrequency;
+}
+
+qreal
 SimplePhaseComparator::getFrequencyLo() const
 {
   if (m_analyzer == nullptr)

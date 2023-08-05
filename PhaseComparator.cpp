@@ -146,14 +146,34 @@ PhaseComparator::connectAll()
 }
 
 void
+PhaseComparator::updatePlotProperties()
+{
+  if (m_plotPage != nullptr) {
+    m_plotPage->setFreqencyLimits(
+          ui->frequencySpin->minimum(),
+          ui->frequencySpin->maximum());
+
+    m_plotPage->setProperties(
+          this,
+          m_comparator->getEquivFs(),
+          ui->frequencySpin->value(),
+          ui->bandwidthSpin->value());
+  }
+}
+
+void
 PhaseComparator::applySpectrumState()
 {
   if (m_analyzer != nullptr) {
     qreal fc = SCAST(qreal, m_spectrum->getCenterFreq());
     qreal fs = SCAST(qreal, m_analyzer->getSampleRate());
+    qreal min = fc - .5 * fs;
+    qreal max = fc + .5 * fs;
 
-    ui->frequencySpin->setMinimum(fc - .5 * fs);
-    ui->frequencySpin->setMaximum(fc + .5 * fs);
+    ui->frequencySpin->setMinimum(min);
+    ui->frequencySpin->setMaximum(max);
+
+    updatePlotProperties();
   }
 
   onAdjustFrequency();
@@ -301,17 +321,32 @@ PhaseComparator::openPlot()
   auto sus = Suscan::Singleton::get_instance();
   auto factory = sus->findTabWidgetFactory("PhasePlotPage");
 
+  if (m_analyzer == nullptr)
+    return;
+
   m_plotPage = SCAST(PhasePlotPage *, factory->make(m_mediator));
-  m_plotPage->setProperties(
-        this,
-        .5 * (m_comparator->getFrequencyHi() + m_comparator->getFrequencyLo()),
-        m_comparator->getEquivFs());
   m_plotPage->setColorConfig(m_colors);
+
   connect(
         m_plotPage,
         SIGNAL(closeReq()),
         this,
         SLOT(onClosePlotPage()));
+
+  connect(
+        m_plotPage,
+        SIGNAL(frequencyChanged(double)),
+        this,
+        SLOT(onAdjustFrequencyRequested(qreal)));
+
+
+  connect(
+        m_plotPage,
+        SIGNAL(bandwidthChanged(qreal)),
+        this,
+        SLOT(onAdjustBandwidthRequested(qreal)));
+
+  updatePlotProperties();
 
   m_mediator->addTabWidget(m_plotPage);
 }
@@ -348,10 +383,11 @@ PhaseComparator::onOpenChannel()
   auto bandwidth  = m_spectrum->getBandwidth();
   auto loFreq     = m_spectrum->getLoFreq();
   auto centerFreq = m_spectrum->getCenterFreq();
+  auto delta      = m_analyzer->getSampleRate() * .25;
   auto freq       = centerFreq + loFreq;
 
   BLOCKSIG(ui->bandwidthSpin, setValue(bandwidth));
-  BLOCKSIG(ui->frequencySpin, setValue(freq));
+  BLOCKSIG(ui->frequencySpin, setValue(freq + delta));
 
   auto result = m_comparator->open(freq, bandwidth);
 
@@ -364,6 +400,20 @@ PhaseComparator::onOpenChannel()
 }
 
 void
+PhaseComparator::onAdjustFrequencyRequested(qreal freq)
+{
+  ui->frequencySpin->setValue(freq);
+  onAdjustFrequency();
+}
+
+void
+PhaseComparator::onAdjustBandwidthRequested(qreal bw)
+{
+  ui->bandwidthSpin->setValue(bw);
+  onAdjustBandwidth();
+}
+
+void
 PhaseComparator::onCloseChannel()
 {
   m_comparator->close();
@@ -372,14 +422,19 @@ PhaseComparator::onCloseChannel()
 void
 PhaseComparator::onAdjustFrequency()
 {
-  m_comparator->setFrequency(ui->frequencySpin->value());
-  refreshNamedChannel();
+  if (m_analyzer != nullptr) {
+    auto delta = m_analyzer->getSampleRate() * .25;
+    m_comparator->setFrequency(ui->frequencySpin->value() - delta);
+    updatePlotProperties();
+    refreshNamedChannel();
+  }
 }
 
 void
 PhaseComparator::onAdjustBandwidth()
 {
   m_comparator->setBandwidth(ui->bandwidthSpin->value());
+  updatePlotProperties();
   refreshNamedChannel();
 }
 

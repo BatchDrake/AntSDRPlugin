@@ -61,6 +61,7 @@ namespace SigDigger {
 
     qreal setBandwidth(qreal bandwidth);
     void  setFrequency(qreal freq);
+    qreal getFrequency() const;
 
     qreal getFrequencyLo() const;
     qreal getFrequencyHi() const;

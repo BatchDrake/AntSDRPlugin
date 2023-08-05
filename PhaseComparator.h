@@ -72,6 +72,7 @@ namespace SigDigger {
     ColorConfig    m_colors;
 
     void openPlot();
+    void updatePlotProperties();
     void applySpectrumState();
     void connectAll();
     void refreshUi();
@@ -100,6 +101,9 @@ namespace SigDigger {
     void onAdjustFrequency();
     void onAdjustBandwidth();
 
+    void onAdjustFrequencyRequested(qreal);
+    void onAdjustBandwidthRequested(qreal);
+
     void onComparatorOpened();
     void onComparatorClosed();
     void onComparatorError(QString);
@@ -108,6 +112,8 @@ namespace SigDigger {
 
     void onSpectrumFrequencyChanged(qint64);
     void onClosePlotPage();
+
+
   private:
     Ui::PhaseComparator *ui;
   };

@@ -74,8 +74,92 @@ PhasePlotPage::PhasePlotPage(
   ui->waveform->setAutoScroll(true);
 
   ui->phaseView->setHistorySize(100);
+
+  connectAll();
 }
 
+void
+PhasePlotPage::connectAll()
+{
+  connect(
+        ui->savePlotButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onSavePlot()));
+
+  connect(
+        ui->autoScrollButton,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onAutoScrollToggled()));
+
+  connect(
+        ui->clearButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onClear()));
+
+  connect(
+        ui->autoFitButton,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onAutoFitToggled()));
+
+  connect(
+        ui->gainSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onGainChanged()));
+
+  connect(
+        ui->freqSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onChangeFrequency()));
+
+  connect(
+        ui->bwSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onChangeBandwidth()));
+
+  connect(
+        ui->phaseOriginSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onChangePhaseOrigin()));
+
+  connect(
+        ui->measurementTimeSpin,
+        SIGNAL(changed(qreal,qreal)),
+        this,
+        SLOT(onChangeMeasurementTime()));
+
+  connect(
+        ui->coherenceThresholdSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onChangeCoherenceThreshold()));
+
+  connect(
+        ui->enableLoggerButton,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onLogEnableToggled()));
+
+  connect(
+        ui->saveLogButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onSaveLog()));
+
+  connect(
+        ui->clearLogButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onClearLog()));
+
+}
 
 void
 PhasePlotPage::feed(const SUCOMPLEX *data, SUSCOUNT size)
@@ -97,12 +181,31 @@ PhasePlotPage::feed(const SUCOMPLEX *data, SUSCOUNT size)
 }
 
 void
-PhasePlotPage::setProperties(PhaseComparator *owner, SUFREQ frequency, SUFLOAT sampRate)
+PhasePlotPage::setFreqencyLimits(SUFREQ min, SUFREQ max)
+{
+  ui->freqSpin->setMinimum(min);
+  ui->freqSpin->setMaximum(max);
+}
+
+void
+PhasePlotPage::setProperties(
+    PhaseComparator *owner,
+    SUFLOAT sampRate,
+    SUFREQ frequency,
+    SUFLOAT bandwidth)
 {
   m_owner = owner;
 
-  if (!m_paramsSet)
+  if (!m_paramsSet) {
     ui->waveform->setSampleRate(sampRate);
+    ui->bwSpin->setMinimum(0);
+    ui->bwSpin->setMaximum(sampRate);
+    ui->sampRateLabel->setText(
+          SuWidgetsHelpers::formatQuantity(sampRate, 4, "sps"));
+  }
+
+  BLOCKSIG(ui->freqSpin, setValue(frequency));
+  BLOCKSIG(ui->bwSpin,   setValue(bandwidth));
 
   m_paramsSet = true;
 }
@@ -155,7 +258,7 @@ PhasePlotPage::refreshUi()
   if (!m_config->autoFit) {
     m_gain = SU_POWER_MAG_RAW(m_config->gainDb);
     qreal limits = 1 / m_gain;
-    ui->waveform->zoomHorizontal(-limits, +limits);
+    ui->waveform->zoomVertical(-limits, +limits);
     ui->phaseView->setGain(m_gain);
   }
 }
@@ -169,23 +272,123 @@ PhasePlotPage::applyConfig(void)
 void
 PhasePlotPage::setTimeStamp(struct timeval const &)
 {
-  if (m_accumCount > 0) {
-    SUFLOAT mag;
+  // Update gain
+  if (m_config->autoFit && m_accumCount > 0) {
+    SUFLOAT mag, gain;
+    bool adjust = false;
     m_accumulated /= m_accumCount;
     mag = SU_C_ABS(m_accumulated);
+
     if (mag > m_max) {
       m_max = mag;
-      ui->phaseView->setGain(1. / m_max);
+      gain = 1. / m_max;
+      adjust = true;
     } else {
       SU_SPLPF_FEED(m_max, mag, 1e-2);
-      if (m_max > std::numeric_limits<SUFLOAT>::epsilon())
-        ui->phaseView->setGain(1. / m_max);
+      if (m_max > std::numeric_limits<SUFLOAT>::epsilon()) {
+        adjust = true;
+        gain = 1. / m_max;
+      }
     }
+
+    if (adjust) {
+      m_config->gainDb = SU_POWER_DB_RAW(gain);
+      BLOCKSIG(ui->gainSpin, setValue(m_config->gainDb));
+    }
+
     m_accumCount = 0;
   }
+
+  // Update buffer size
+  ui->sizeLabel->setText(
+        SuWidgetsHelpers::formatBinaryQuantity(
+          m_data.size() * sizeof(SUCOMPLEX)));
 }
 
 PhasePlotPage::~PhasePlotPage()
 {
   delete ui;
+}
+
+////////////////////////////////// Slots ///////////////////////////////////////
+void
+PhasePlotPage::onSavePlot()
+{
+
+}
+
+void
+PhasePlotPage::onAutoScrollToggled()
+{
+  m_config->autoScroll = ui->autoScrollButton->isChecked();
+  refreshUi();
+}
+
+void
+PhasePlotPage::onClear()
+{
+  m_data.clear();
+  ui->waveform->refreshData();
+}
+
+void
+PhasePlotPage::onAutoFitToggled()
+{
+  m_config->autoFit = ui->autoFitButton->isChecked();
+  refreshUi();
+}
+
+void
+PhasePlotPage::onGainChanged()
+{
+  m_config->gainDb = ui->gainSpin->value();
+  refreshUi();
+}
+
+void
+PhasePlotPage::onChangeFrequency()
+{
+  emit frequencyChanged(ui->freqSpin->value());
+}
+
+void
+PhasePlotPage::onChangeBandwidth()
+{
+  emit bandwidthChanged(ui->bwSpin->value());
+}
+
+void
+PhasePlotPage::onChangePhaseOrigin()
+{
+  m_config->phaseOrigin = ui->phaseOriginSpin->value();
+}
+
+void
+PhasePlotPage::onChangeMeasurementTime()
+{
+  m_config->measurementTime = ui->measurementTimeSpin->timeValue();
+}
+
+void
+PhasePlotPage::onChangeCoherenceThreshold()
+{
+  m_config->coherenceThreshold = ui->coherenceThresholdSpin->value();
+}
+
+void
+PhasePlotPage::onLogEnableToggled()
+{
+  m_config->logEvents = ui->enableLoggerButton->isChecked();
+}
+
+void
+PhasePlotPage::onSaveLog()
+{
+
+}
+
+void
+PhasePlotPage::onClearLog()
+{
+  ui->logTextEdit->clear();
 }

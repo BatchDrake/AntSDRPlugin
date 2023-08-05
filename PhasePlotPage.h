@@ -58,6 +58,7 @@ namespace SigDigger {
     SUFLOAT   m_gain = 1;
 
     void refreshUi();
+    void connectAll();
 
   public:
     explicit PhasePlotPage(
@@ -68,7 +69,13 @@ namespace SigDigger {
     ~PhasePlotPage();
 
     void feed(const SUCOMPLEX *, SUSCOUNT);
-    void setProperties(PhaseComparator *, SUFREQ frequency, SUFLOAT sampRate);
+    void setFreqencyLimits(SUFREQ min, SUFREQ max);
+
+    void setProperties(
+        PhaseComparator *,
+        SUFLOAT sampRate,
+        SUFREQ  frequency,
+        SUFLOAT bandwidth);
 
     virtual std::string getLabel() const override;
     virtual void closeRequested() override;
@@ -83,6 +90,23 @@ namespace SigDigger {
 
   signals:
     void closeReq();
+    void frequencyChanged(qreal);
+    void bandwidthChanged(qreal);
+
+  public slots:
+    void onSavePlot();
+    void onAutoScrollToggled();
+    void onClear();
+    void onAutoFitToggled();
+    void onGainChanged();
+    void onChangeFrequency();
+    void onChangeBandwidth();
+    void onChangePhaseOrigin();
+    void onChangeMeasurementTime();
+    void onChangeCoherenceThreshold();
+    void onLogEnableToggled();
+    void onSaveLog();
+    void onClearLog();
   };
 
 }
