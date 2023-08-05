@@ -30,6 +30,14 @@ namespace SigDigger {
 
   class PhasePlotPageConfig : public Suscan::Serializable {
   public:
+    bool  autoFit            = true;
+    bool  autoScroll         = true;
+    float gainDb             = 0;
+    float phaseOrigin        = 0;
+    bool  logEvents          = false;
+    float measurementTime    = .2;
+    float coherenceThreshold = 10.;
+
     // Overriden methods
     void deserialize(Suscan::Object const &conf) override;
     Suscan::Object &&serialize() override;
@@ -47,6 +55,9 @@ namespace SigDigger {
     SUCOMPLEX m_accumulated;
     SUSCOUNT  m_accumCount = 0;
     SUFLOAT   m_max = 0;
+    SUFLOAT   m_gain = 1;
+
+    void refreshUi();
 
   public:
     explicit PhasePlotPage(

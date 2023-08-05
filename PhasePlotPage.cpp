@@ -22,9 +22,20 @@
 
 using namespace SigDigger;
 
+#define STRINGFY(x) #x
+#define STORE(field) obj.set(STRINGFY(field), this->field)
+#define LOAD(field) this->field = conf.get(STRINGFY(field), this->field)
+
 void
-PhasePlotPageConfig::deserialize(Suscan::Object const &)
+PhasePlotPageConfig::deserialize(Suscan::Object const &conf)
 {
+  LOAD(autoFit);
+  LOAD(autoScroll);
+  LOAD(gainDb);
+  LOAD(phaseOrigin);
+  LOAD(logEvents);
+  LOAD(measurementTime);
+  LOAD(coherenceThreshold);
 }
 
 Suscan::Object &&
@@ -33,6 +44,14 @@ PhasePlotPageConfig::serialize()
   Suscan::Object obj(SUSCAN_OBJECT_TYPE_OBJECT);
 
   obj.setClass("PhasePlotPageConfig");
+
+  STORE(autoFit);
+  STORE(autoScroll);
+  STORE(gainDb);
+  STORE(phaseOrigin);
+  STORE(logEvents);
+  STORE(measurementTime);
+  STORE(coherenceThreshold);
 
   return persist(obj);
 }
@@ -120,9 +139,31 @@ PhasePlotPage::allocConfig(void)
 }
 
 void
+PhasePlotPage::refreshUi()
+{
+  BLOCKSIG(ui->autoFitButton,          setChecked(m_config->autoFit));
+  BLOCKSIG(ui->autoScrollButton,       setChecked(m_config->autoScroll));
+  BLOCKSIG(ui->gainSpin,               setValue(m_config->gainDb));
+  BLOCKSIG(ui->enableLoggerButton,     setChecked(m_config->logEvents));
+  BLOCKSIG(ui->measurementTimeSpin,    setTimeValue(m_config->measurementTime));
+  BLOCKSIG(ui->coherenceThresholdSpin, setValue(m_config->coherenceThreshold));
+
+  ui->gainSpin->setEnabled(!m_config->autoFit);
+  ui->waveform->setAutoFitToEnvelope(m_config->autoFit);
+  ui->waveform->setAutoScroll(m_config->autoScroll);
+
+  if (!m_config->autoFit) {
+    m_gain = SU_POWER_MAG_RAW(m_config->gainDb);
+    qreal limits = 1 / m_gain;
+    ui->waveform->zoomHorizontal(-limits, +limits);
+    ui->phaseView->setGain(m_gain);
+  }
+}
+
+void
 PhasePlotPage::applyConfig(void)
 {
-  // NO-OP
+  refreshUi();
 }
 
 void
