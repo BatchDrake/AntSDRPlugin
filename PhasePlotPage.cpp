@@ -240,6 +240,12 @@ PhasePlotPage::setProperties(
 
     ui->sampRateLabel->setText(
           SuWidgetsHelpers::formatQuantity(sampRate, 4, "sps"));
+
+
+    emit nameChanged(
+          "Phase comparison at " + SuWidgetsHelpers::formatQuantity(
+            frequency,
+            "Hz"));
   }
 
   BLOCKSIG(ui->freqSpin, setValue(frequency));
@@ -251,7 +257,9 @@ PhasePlotPage::setProperties(
 std::string
 PhasePlotPage::getLabel() const
 {
-  return "Phase plot";
+  return ("Phase comparison at " + SuWidgetsHelpers::formatQuantity(
+          ui->freqSpin->value(),
+          "Hz")).toStdString();
 }
 
 void
