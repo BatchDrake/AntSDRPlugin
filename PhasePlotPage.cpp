@@ -19,6 +19,8 @@
 #include "PhasePlotPage.h"
 #include "ui_PhasePlotPage.h"
 #include <ColorConfig.h>
+#include "CoherentDetector.h"
+#include <QDateTime>
 
 using namespace SigDigger;
 
@@ -74,6 +76,8 @@ PhasePlotPage::PhasePlotPage(
   ui->waveform->setAutoScroll(true);
 
   ui->phaseView->setHistorySize(100);
+
+  m_detector = new CoherentDetector();
 
   connectAll();
 }
@@ -162,10 +166,13 @@ PhasePlotPage::connectAll()
 }
 
 void
-PhasePlotPage::feed(const SUCOMPLEX *data, SUSCOUNT size)
+PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT size)
 {
+  SUSCOUNT ptr = 0, got;
+
   for (SUSCOUNT i = 0; i < size; ++i)
     m_accumulated += data[i];
+
   m_accumCount += size;
 
 
@@ -177,6 +184,32 @@ PhasePlotPage::feed(const SUCOMPLEX *data, SUSCOUNT size)
     if (first)
       ui->waveform->zoomHorizontal(0., 10.);
     ui->phaseView->feed(data, size);
+  }
+
+  if (m_config->logEvents && m_detector->enabled()) {
+    while (ptr < size) {
+      got = m_detector->feed(data + ptr, size - ptr);
+      if (m_detector->triggered() != m_haveEvent) {
+        QString prefix;
+        struct timeval delta, time;
+        qreal progress = got / m_sampRate;
+        m_haveEvent = m_detector->triggered();
+
+        delta.tv_sec  = std::floor(progress);
+        delta.tv_usec = std::floor(progress * 1e6);
+        timeradd(&tv, &delta, &time);
+
+        QDateTime timestamp = QDateTime::fromSecsSinceEpoch(time.tv_sec);
+        QString date = timestamp.toUTC().toString();
+        prefix = "[" + date + "] ";
+
+        if (m_haveEvent)
+          ui->logTextEdit->appendPlainText(prefix + "Coherent signal detected!");
+        else
+          ui->logTextEdit->appendPlainText(prefix + "Signal lost");
+      }
+      ptr += got;
+    }
   }
 }
 
@@ -197,9 +230,14 @@ PhasePlotPage::setProperties(
   m_owner = owner;
 
   if (!m_paramsSet) {
+    m_sampRate = sampRate;
     ui->waveform->setSampleRate(sampRate);
     ui->bwSpin->setMinimum(0);
     ui->bwSpin->setMaximum(sampRate);
+    ui->measurementTimeSpin->setTimeMin(2 / m_sampRate);
+    ui->measurementTimeSpin->setTimeMax(3600);
+    ui->measurementTimeSpin->setBestUnits(true);
+
     ui->sampRateLabel->setText(
           SuWidgetsHelpers::formatQuantity(sampRate, 4, "sps"));
   }
@@ -267,6 +305,8 @@ void
 PhasePlotPage::applyConfig(void)
 {
   refreshUi();
+  m_detector->resize(m_config->measurementTime * m_sampRate);
+  m_detector->setThreshold(m_config->coherenceThreshold * M_PI / 180);
 }
 
 void
@@ -307,6 +347,7 @@ PhasePlotPage::setTimeStamp(struct timeval const &)
 
 PhasePlotPage::~PhasePlotPage()
 {
+  delete m_detector;
   delete ui;
 }
 
@@ -367,18 +408,22 @@ void
 PhasePlotPage::onChangeMeasurementTime()
 {
   m_config->measurementTime = ui->measurementTimeSpin->timeValue();
+  m_detector->resize(m_config->measurementTime * m_sampRate);
 }
 
 void
 PhasePlotPage::onChangeCoherenceThreshold()
 {
   m_config->coherenceThreshold = ui->coherenceThresholdSpin->value();
+  m_detector->setThreshold(m_config->coherenceThreshold * M_PI / 180);
 }
 
 void
 PhasePlotPage::onLogEnableToggled()
 {
   m_config->logEvents = ui->enableLoggerButton->isChecked();
+  m_detector->reset();
+  m_haveEvent = false;
 }
 
 void

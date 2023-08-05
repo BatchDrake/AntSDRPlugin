@@ -27,6 +27,7 @@ namespace Ui {
 
 namespace SigDigger {
   class PhaseComparator;
+  class CoherentDetector;
 
   class PhasePlotPageConfig : public Suscan::Serializable {
   public:
@@ -49,13 +50,17 @@ namespace SigDigger {
 
     bool m_paramsSet              = false;
     PhaseComparator *m_owner      = nullptr;
+    CoherentDetector *m_detector  = nullptr;
     PhasePlotPageConfig *m_config = nullptr;
 
     std::vector<SUCOMPLEX> m_data;
+    SUFLOAT   m_sampRate;
     SUCOMPLEX m_accumulated;
     SUSCOUNT  m_accumCount = 0;
     SUFLOAT   m_max = 0;
     SUFLOAT   m_gain = 1;
+
+    bool      m_haveEvent = false;
 
     void refreshUi();
     void connectAll();
@@ -68,7 +73,7 @@ namespace SigDigger {
 
     ~PhasePlotPage();
 
-    void feed(const SUCOMPLEX *, SUSCOUNT);
+    void feed(struct timeval const &tv, const SUCOMPLEX *, SUSCOUNT);
     void setFreqencyLimits(SUFREQ min, SUFREQ max);
 
     void setProperties(

@@ -39,6 +39,7 @@ SOURCES += Registration.cpp \
   AD9361SourcePage.cpp \
   AD9361SourcePageFactory.cpp \
   2rx_ad9361.c \
+  CoherentDetector.cpp \
   PhaseComparator.cpp \
   PhaseComparatorFactory.cpp \
   PhasePlotPage.cpp \
@@ -49,6 +50,7 @@ SOURCES += Registration.cpp \
 HEADERS += 2rx_ad9361.h \
   AD9361SourcePage.h \
   AD9361SourcePageFactory.h \
+  CoherentDetector.h \
   PhaseComparator.h \
   PhaseComparatorFactory.h \
   PhasePlotPage.h \

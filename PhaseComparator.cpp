@@ -482,8 +482,9 @@ PhaseComparator::onComparatorData()
 {
   auto data = m_comparator->data();
 
-  if (m_plotPage != nullptr)
-    m_plotPage->feed(data.data(), data.size());
+  if (m_plotPage != nullptr && m_analyzer != nullptr) {
+    m_plotPage->feed(m_analyzer->getSourceTimeStamp(), data.data(), data.size());
+  }
 
   ++m_count;
   //ui->stateLabel->setText(QString::number(m_count) + " packets");
