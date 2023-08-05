@@ -65,19 +65,26 @@ PhasePlotPage::feed(const SUCOMPLEX *data, SUSCOUNT size)
     m_accumulated += data[i];
   m_accumCount += size;
 
-  m_data.insert(m_data.end(), data, data + size);
 
-  if (m_paramsSet)
+  if (m_paramsSet) {
+    bool first = m_data.size() == 0;
+    m_data.insert(m_data.end(), data, data + size);
     ui->waveform->refreshData();
 
-   ui->phaseView->feed(data, size);
+    if (first)
+      ui->waveform->zoomHorizontal(0., 10.);
+    ui->phaseView->feed(data, size);
+  }
 }
 
 void
 PhasePlotPage::setProperties(PhaseComparator *owner, SUFREQ frequency, SUFLOAT sampRate)
 {
   m_owner = owner;
-  ui->waveform->setSampleRate(sampRate);
+
+  if (!m_paramsSet)
+    ui->waveform->setSampleRate(sampRate);
+
   m_paramsSet = true;
 }
 
@@ -101,6 +108,9 @@ PhasePlotPage::setColorConfig(ColorConfig const &cfg)
   ui->waveform->setAxesColor(cfg.spectrumAxes);
   ui->waveform->setTextColor(cfg.spectrumText);
   ui->waveform->setSelectionColor(cfg.selection);
+
+  ui->phaseView->setBackgroundColor(cfg.spectrumBackground);
+  ui->phaseView->setAxesColor(cfg.spectrumAxes);
 }
 
 Suscan::Serializable *
@@ -124,11 +134,11 @@ PhasePlotPage::setTimeStamp(struct timeval const &)
     mag = SU_C_ABS(m_accumulated);
     if (mag > m_max) {
       m_max = mag;
-      ui->phaseView->setGain(1 / m_max);
+      ui->phaseView->setGain(1. / m_max);
     } else {
-      SU_SPLPF_FEED(m_max, 10 * mag, 1e-2);
+      SU_SPLPF_FEED(m_max, mag, 1e-2);
       if (m_max > std::numeric_limits<SUFLOAT>::epsilon())
-        ui->phaseView->setGain(1 / m_max);
+        ui->phaseView->setGain(1. / m_max);
     }
     m_accumCount = 0;
   }

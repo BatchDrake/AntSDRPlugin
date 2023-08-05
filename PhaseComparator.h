@@ -24,6 +24,7 @@
 #include <WFHelpers.h>
 #include <QWidget>
 #include <QFile>
+#include <ColorConfig.h>
 
 namespace Ui {
   class PhaseComparator;
@@ -68,6 +69,7 @@ namespace SigDigger {
 
     // Current plot
     PhasePlotPage *m_plotPage = nullptr;
+    ColorConfig    m_colors;
 
     void openPlot();
     void applySpectrumState();

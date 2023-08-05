@@ -306,7 +306,7 @@ PhaseComparator::openPlot()
         this,
         .5 * (m_comparator->getFrequencyHi() + m_comparator->getFrequencyLo()),
         m_comparator->getEquivFs());
-
+  m_plotPage->setColorConfig(m_colors);
   connect(
         m_plotPage,
         SIGNAL(closeReq()),
@@ -323,9 +323,9 @@ PhaseComparator::setQth(Suscan::Location const &)
 }
 
 void
-PhaseComparator::setColorConfig(ColorConfig const &)
+PhaseComparator::setColorConfig(ColorConfig const &colors)
 {
-
+  m_colors = colors;
 }
 
 void
