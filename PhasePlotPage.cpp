@@ -211,7 +211,7 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
     ui->waveform->refreshData();
 
     if (first) {
-      ui->waveform->zoomHorizontal(0., 10.);
+      ui->waveform->zoomHorizontal(SCAST(qint64, 0), SCAST(qint64, 50000));
       ui->savePlotButton->setEnabled(true);
     }
     ui->phaseView->feed(data, size);
