@@ -21,6 +21,9 @@
 #include <ColorConfig.h>
 #include "CoherentDetector.h"
 #include <QDateTime>
+#include <SigDiggerHelpers.h>
+#include <QFileDialog>
+#include <QMessageBox>
 
 using namespace SigDigger;
 
@@ -76,6 +79,8 @@ PhasePlotPage::PhasePlotPage(
   ui->waveform->setAutoScroll(true);
 
   ui->phaseView->setHistorySize(100);
+
+  ui->savePlotButton->setEnabled(false);
 
   m_detector = new CoherentDetector();
 
@@ -166,6 +171,23 @@ PhasePlotPage::connectAll()
 }
 
 void
+PhasePlotPage::logText(QString const &text)
+{
+  logText(m_lastTimeStamp, text);
+}
+
+void
+PhasePlotPage::logText(struct timeval const &time, QString const &text)
+{
+  QString prefix;
+  QDateTime timestamp = QDateTime::fromSecsSinceEpoch(time.tv_sec);
+  QString date = timestamp.toUTC().toString();
+  prefix = "[" + date + "] ";
+
+  ui->logTextEdit->appendPlainText(prefix + text);
+}
+
+void
 PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT size)
 {
   SUSCOUNT ptr = 0, got;
@@ -175,14 +197,23 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
 
   m_accumCount += size;
 
+  if (ui->logTextEdit->document()->isEmpty())
+    logDetectorInfo();
 
   if (m_paramsSet) {
     bool first = m_data.size() == 0;
-    m_data.insert(m_data.end(), data, data + size);
+    SUSCOUNT orig = m_data.size();
+
+    m_data.resize(orig + size);
+    for (SUSCOUNT i = 0; i < size; ++i)
+      m_data[i + orig] = data[i] * m_phaseAdjust;
+
     ui->waveform->refreshData();
 
-    if (first)
+    if (first) {
       ui->waveform->zoomHorizontal(0., 10.);
+      ui->savePlotButton->setEnabled(true);
+    }
     ui->phaseView->feed(data, size);
   }
 
@@ -190,26 +221,64 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
     while (ptr < size) {
       got = m_detector->feed(data + ptr, size - ptr);
       if (m_detector->triggered() != m_haveEvent) {
-        QString prefix;
         struct timeval delta, time;
-        qreal progress = got / m_sampRate;
+        qreal progress = ptr / m_sampRate;
         m_haveEvent = m_detector->triggered();
 
         delta.tv_sec  = std::floor(progress);
         delta.tv_usec = std::floor(progress * 1e6);
         timeradd(&tv, &delta, &time);
 
-        QDateTime timestamp = QDateTime::fromSecsSinceEpoch(time.tv_sec);
-        QString date = timestamp.toUTC().toString();
-        prefix = "[" + date + "] ";
+        if (m_haveEvent) {
+          m_lastEvent = time;
+          logText(time, "Coherent event detected.");
+        } else {
+          if (m_detector->haveEvent()) {
+            timersub(&time, &m_lastEvent, &delta);
+            qreal asSeconds = delta.tv_sec + delta.tv_usec * 1e-6;
+            logText(
+                  time,
+                  "Coherent event end. Duration = " +
+                  SuWidgetsHelpers::formatQuantity(asSeconds, 4, "s") +
+                  ", power = " +
+                  QString::number(SU_POWER_DB_RAW(m_detector->lastPower())) +
+                  " dB");
+          }
 
-        if (m_haveEvent)
-          ui->logTextEdit->appendPlainText(prefix + "Coherent signal detected!");
-        else
-          ui->logTextEdit->appendPlainText(prefix + "Signal lost");
+        }
       }
       ptr += got;
     }
+  }
+}
+
+void
+PhasePlotPage::logDetectorInfo()
+{
+  logText("Coherent detector configuration:");
+  logText("  Channel:              " + QString::number(ui->freqSpin->value()) + " Hz, " + QString::number(ui->bwSpin->value()) + " Hz bandwidth");
+  logText("  Gain:                 " + QString::number(ui->gainSpin->value()) + " dB, " + SuWidgetsHelpers::formatQuantity(m_config->phaseOrigin, "º") + " offset");
+  logText("  Max phase dispersion: " + SuWidgetsHelpers::formatQuantity(m_config->coherenceThreshold, "º"));
+  logText("  Measuremen interval:  " + SuWidgetsHelpers::formatQuantity(
+            m_config->measurementTime,
+            4,
+            "s"));
+}
+
+void
+PhasePlotPage::clearData()
+{
+  qint64 size = m_data.size() * sizeof(SUCOMPLEX);
+
+  m_data.clear();
+  ui->savePlotButton->setEnabled(false);
+  ui->waveform->refreshData();
+
+  if (m_haveEvent) {
+    m_haveEvent = false;
+    logText(
+          "Data buffer cleared after a capture of " +
+          SuWidgetsHelpers::formatBinaryQuantity(size));
   }
 }
 
@@ -313,14 +382,18 @@ void
 PhasePlotPage::applyConfig(void)
 {
   refreshUi();
+
+  m_phaseAdjust = SU_C_EXP(-SU_I * SU_DEG2RAD(m_config->phaseOrigin));
   m_detector->resize(m_config->measurementTime * m_sampRate);
-  m_detector->setThreshold(m_config->coherenceThreshold * M_PI / 180);
+  m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
 }
 
 void
-PhasePlotPage::setTimeStamp(struct timeval const &)
+PhasePlotPage::setTimeStamp(struct timeval const &ts)
 {
   // Update gain
+  m_lastTimeStamp = ts;
+
   if (m_config->autoFit && m_accumCount > 0) {
     SUFLOAT mag, gain;
     bool adjust = false;
@@ -363,7 +436,14 @@ PhasePlotPage::~PhasePlotPage()
 void
 PhasePlotPage::onSavePlot()
 {
-
+  SigDiggerHelpers::openSaveSamplesDialog(
+        this,
+        m_data.data(),
+        m_data.size(),
+        m_sampRate,
+        0,
+        m_data.size(),
+        Suscan::Singleton::get_instance()->getBackgroundTaskController());
 }
 
 void
@@ -376,8 +456,7 @@ PhasePlotPage::onAutoScrollToggled()
 void
 PhasePlotPage::onClear()
 {
-  m_data.clear();
-  ui->waveform->refreshData();
+  clearData();
 }
 
 void
@@ -410,6 +489,7 @@ void
 PhasePlotPage::onChangePhaseOrigin()
 {
   m_config->phaseOrigin = ui->phaseOriginSpin->value();
+  m_phaseAdjust = SU_C_EXP(-SU_I * SU_DEG2RAD(m_config->phaseOrigin));
 }
 
 void
@@ -417,13 +497,17 @@ PhasePlotPage::onChangeMeasurementTime()
 {
   m_config->measurementTime = ui->measurementTimeSpin->timeValue();
   m_detector->resize(m_config->measurementTime * m_sampRate);
+
+  logDetectorInfo();
 }
 
 void
 PhasePlotPage::onChangeCoherenceThreshold()
 {
   m_config->coherenceThreshold = ui->coherenceThresholdSpin->value();
-  m_detector->setThreshold(m_config->coherenceThreshold * M_PI / 180);
+  m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
+
+  logDetectorInfo();
 }
 
 void
@@ -437,11 +521,48 @@ PhasePlotPage::onLogEnableToggled()
 void
 PhasePlotPage::onSaveLog()
 {
+  bool done = false;
 
+  do {
+    QFileDialog dialog(this);
+    QStringList filters;
+
+    dialog.setFileMode(QFileDialog::FileMode::AnyFile);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setWindowTitle(QString("Save event log"));
+
+    filters << "Event log (*.log)"
+            << "All files (*)";
+
+    dialog.setNameFilters(filters);
+
+    if (dialog.exec()) {
+      auto selected = dialog.selectedFiles();
+      QString path = selected.first();
+      QFile outfile;
+
+      outfile.setFileName(path);
+      outfile.open(QIODevice::Text | QIODevice::WriteOnly);
+
+      if (!outfile.isOpen()) {
+        QMessageBox::critical(
+              this,
+              "Save event log",
+              "Cannot save event file: " + outfile.errorString());
+      } else {
+        QTextStream out(&outfile);
+        out << ui->logTextEdit->toPlainText() << "\n";
+        done = true;
+      }
+    } else {
+      done = true;
+    }
+  } while (!done);
 }
 
 void
 PhasePlotPage::onClearLog()
 {
   ui->logTextEdit->clear();
+  m_infoLogged = false;
 }

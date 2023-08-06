@@ -59,11 +59,19 @@ namespace SigDigger {
     SUSCOUNT  m_accumCount = 0;
     SUFLOAT   m_max = 0;
     SUFLOAT   m_gain = 1;
+    SUCOMPLEX m_phaseAdjust = 1;
 
+    struct timeval m_lastTimeStamp;
+    struct timeval m_lastEvent;
+    bool      m_infoLogged = false;
     bool      m_haveEvent = false;
 
+    void logDetectorInfo();
+    void clearData();
     void refreshUi();
     void connectAll();
+    void logText(QString const &);
+    void logText(struct timeval const &, QString const &);
 
   public:
     explicit PhasePlotPage(

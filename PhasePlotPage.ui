@@ -105,7 +105,7 @@
       <item row="2" column="0" colspan="2">
        <widget class="QWidget" name="widget_2" native="true">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
@@ -173,6 +173,12 @@
       </item>
       <item row="0" column="2" rowspan="3">
        <widget class="QPlainTextEdit" name="logTextEdit">
+        <property name="font">
+         <font>
+          <family>Monospace</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
         <property name="verticalScrollBarPolicy">
          <enum>Qt::ScrollBarAlwaysOn</enum>
         </property>
@@ -377,6 +383,7 @@
         <property name="font">
          <font>
           <family>Monospace</family>
+          <pointsize>9</pointsize>
          </font>
         </property>
         <property name="text">
@@ -415,6 +422,7 @@
         <property name="font">
          <font>
           <family>Monospace</family>
+          <pointsize>9</pointsize>
          </font>
         </property>
         <property name="text">

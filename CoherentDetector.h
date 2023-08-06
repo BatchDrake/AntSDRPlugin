@@ -38,10 +38,14 @@ namespace SigDigger {
   {
     SUCOMPLEX              m_prev = 1;
     SUFLOAT                m_angDeltaAcc = 0;
+    SUFLOAT                m_powerAcc = 0;
+    SUFLOAT                m_lastPower = 0;
     size_t                 m_count = 0;
     size_t                 m_size = 0;
+    size_t                 m_powerCount = 0;
     float                  m_threshold2 = 0;
-    bool                   m_triggered;
+    bool                   m_triggered = false;
+    bool                   m_haveEvent = false;
 
   public:
     CoherentDetector();
@@ -53,7 +57,8 @@ namespace SigDigger {
 
     size_t feed(const SUCOMPLEX *, size_t);
     bool  triggered() const;
-
+    SUFLOAT lastPower() const;
+    bool  haveEvent() const;
   };
 }
 

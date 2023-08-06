@@ -56,11 +56,12 @@ size_t
 CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
 {
   size_t avail, count;
-  SUFLOAT ang, accum;
+  bool triggered;
+  SUFLOAT ang, accum, power;
   SUCOMPLEX prev;
 
   count = m_count;
-
+  triggered = m_triggered;
   if (count >= m_size)
     avail = 0;
   else
@@ -71,9 +72,11 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
 
   prev  = m_prev;
   accum = m_angDeltaAcc;
+  power = m_powerAcc;
 
   // Demodulate
   for (size_t i = 0; i < size; ++i) {
+    power += SU_C_REAL(data[i] * SU_C_CONJ(data[i]));
     ang    = SU_C_ARG(data[i] * SU_C_CONJ(prev));
     accum += ang * ang;
     prev   = data[i];
@@ -84,16 +87,33 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
   avail -= size;
   count += size;
 
+  if (triggered) {
+    m_powerCount += size;
+    m_powerAcc    = power;
+  }
+
   // Detect
   if (avail == 0) {
     accum /= count;
 
-    if (m_triggered) {
-      if (accum > 4 * m_threshold2)
-        m_triggered = false;
+    if (triggered) {
+      if (accum > 4 * m_threshold2) {
+        if (m_powerCount > 0) {
+          m_lastPower = m_powerAcc / m_powerCount;
+          m_haveEvent = true;
+        }
+
+        m_powerAcc   = 0;
+        m_powerCount = 0;
+        m_triggered  = false;
+      }
     } else {
-      if (accum <= m_threshold2)
-        m_triggered = true;
+      if (accum <= m_threshold2) {
+        m_triggered  = true;
+        m_powerAcc   = power;
+        m_powerCount = size;
+        m_haveEvent  = false;
+      }
     }
     accum = 0;
     count = 0;
@@ -109,4 +129,16 @@ bool
 CoherentDetector::triggered() const
 {
   return m_triggered;
+}
+
+SUFLOAT
+CoherentDetector::lastPower() const
+{
+  return m_lastPower;
+}
+
+bool
+CoherentDetector::haveEvent() const
+{
+  return m_haveEvent;
 }
