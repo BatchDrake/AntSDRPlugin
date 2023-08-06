@@ -202,12 +202,6 @@ suscan_source_ad9361_init(
 
   SU_TRYZ(
     iio_channel_attr_write_longlong(
-      self->phy_rx0,
-      "rf_bandwidth",
-      config->samp_rate / 16));
-
-  SU_TRYZ(
-    iio_channel_attr_write_longlong(
       self->alt_chan,
       "frequency",
       config->freq - config->lnb_freq));
@@ -223,9 +217,8 @@ suscan_source_ad9361_init(
   self->samp_rate = config->samp_rate;
 
   /* I am sure EA4GPZ will love this */
-  su_ncqo_init(&self->rx0_nco, -.5);
-  su_ncqo_init(&self->rx1_nco, +.5);
-
+  su_ncqo_init(&self->mixer, -.5);
+  
   ok = SU_TRUE;
 
 done:
@@ -240,6 +233,15 @@ static struct suscan_source_gain_desc g_ad9361_pga_desc = {
   .step = 1
 };
 
+SUPRIVATE SUBOOL suscan_source_ad9361_set_gain(
+    void *userdata,
+    const char *name,
+    SUFLOAT gain);
+
+SUPRIVATE SUBOOL suscan_source_ad9361_set_bandwidth(
+  void *userdata,
+  SUFLOAT bw);
+
 SUPRIVATE SUBOOL
 suscan_source_ad9361_init_info(
   struct suscan_source_ad9361 *self,
@@ -247,6 +249,8 @@ suscan_source_ad9361_init_info(
 {
   struct suscan_source_gain_info *ginfo = NULL;
   struct suscan_source_gain_value gain;
+  int ret;
+  double gain1, gain2;
   char *dup = NULL;
   SUBOOL ok = SU_FALSE;
 
@@ -269,9 +273,27 @@ suscan_source_ad9361_init_info(
   gettimeofday(&info->source_time, NULL);
   gettimeofday(&info->source_start, NULL);
 
+  /* Set bandwidth */
+  info->bandwidth  = self->samp_rate / 16;
+  suscan_source_ad9361_set_bandwidth(self, info->bandwidth);
+  
   /* Add gains */
+  ret = iio_channel_attr_read_double(self->phy_rx0, "hardwaregain", &gain1);
+  if (ret != 0) {
+    SU_ERROR("Failed to read gain on RX 0: %s\n", strerror(-ret));
+    return SU_FALSE;
+  }
+
+  ret = iio_channel_attr_read_double(self->phy_rx1, "hardwaregain", &gain2);
+  if (ret != 0) {
+    SU_ERROR("Failed to read gain on RX 1: %s\n", strerror(-ret));
+    return SU_FALSE;
+  }
+
   gain.desc = &g_ad9361_pga_desc;
-  gain.val  =  g_ad9361_pga_desc.def;
+  gain.val  = .5 * (gain1 + gain2);
+
+  SU_TRY(suscan_source_ad9361_set_gain(self, g_ad9361_pga_desc.name, gain.val));
 
   SU_TRY(ginfo = suscan_source_gain_info_new(&gain));
   SU_TRYC(PTR_LIST_APPEND_CHECK(info->gain, ginfo));
@@ -365,6 +387,7 @@ suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
   const int16_t *data;
   SUSCOUNT samples, i, j;
   SUCOMPLEX rx0, rx1;
+  SUCOMPLEX mix;
   int n_read;
 
   n_read = iio_buffer_refill(self->rx_buf);
@@ -388,9 +411,10 @@ suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
     rx1 = (data[j | 2] + I * data[j | 3]) / 32768.;
 
     /* Just tell me you don't love how these channels are combined */
+    mix = su_ncqo_read(&self->mixer);
     self->synth_buffer[i] = 
-        rx0 * su_ncqo_read(&self->rx0_nco) 
-      + rx1 * su_ncqo_read(&self->rx1_nco);
+        rx0 * mix 
+      + rx1 * SU_C_CONJ(mix);
   }
 
   self->synth_buffer_size     = samples;
@@ -496,6 +520,27 @@ suscan_source_ad9361_set_gain(void *userdata, const char *name, SUFLOAT gain)
 }
 
 SUPRIVATE SUBOOL
+suscan_source_ad9361_set_bandwidth(void *userdata, SUFLOAT bw)
+{
+  struct suscan_source_ad9361 *self = (struct suscan_source_ad9361 *) userdata;
+  int ret;
+
+  ret = iio_channel_attr_write_longlong(self->phy_rx0, "rf_bandwidth", bw);
+  if (ret != 0) {
+    SU_ERROR("Failed to set bandwidth on RX 0: %s\n", strerror(-ret));
+    return SU_FALSE;
+  }
+
+  ret = iio_channel_attr_write_longlong(self->phy_rx1, "rf_bandwidth", bw);
+  if (ret != 1) {
+    SU_ERROR("Failed to set bandwidth on RX 1: %s\n", strerror(-ret));
+    return SU_FALSE;
+  }
+
+  return SU_TRUE;
+}
+
+SUPRIVATE SUBOOL
 suscan_source_ad9361_get_freq_limits(
   const suscan_source_config_t *self,
   SUFREQ *min,
@@ -522,13 +567,13 @@ SUPRIVATE struct suscan_source_interface g_ad9361_source =
   .read            = suscan_source_ad9361_read,
   .get_time        = suscan_source_ad9361_get_time,
   .set_frequency   = suscan_source_ad9361_set_frequency,
+  .set_bandwidth   = suscan_source_ad9361_set_bandwidth,
   .set_gain        = suscan_source_ad9361_set_gain,
   .get_freq_limits = suscan_source_ad9361_get_freq_limits,
 
   /* Unset members */
   .is_real_time    = NULL,
   .set_antenna     = NULL,
-  .set_bandwidth   = NULL,
   .set_ppm         = NULL,
   .set_dc_remove   = NULL,
   .set_agc         = NULL,
