@@ -24,6 +24,7 @@
 #include <SigDiggerHelpers.h>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QTextStream>
 
 using namespace SigDigger;
 
