@@ -312,10 +312,15 @@ void
 PhasePlotPage::clearData()
 {
   qint64 size = m_data.size() * sizeof(SUCOMPLEX);
+  size_t prevAlloc = m_data.capacity();
+
+  ui->waveform->safeCancel();
 
   m_data.resize(0);
-  ui->savePlotButton->setEnabled(false);
+  m_data.reserve(prevAlloc);
+
   ui->waveform->refreshData();
+  ui->savePlotButton->setEnabled(false);
 
   if (m_haveEvent) {
     m_haveEvent = false;
@@ -471,7 +476,8 @@ PhasePlotPage::setTimeStamp(struct timeval const &ts)
         SuWidgetsHelpers::formatBinaryQuantity(
           m_data.capacity() * sizeof(SUCOMPLEX)));
 
-  ui->waveform->refreshData();
+  if (m_data.size() > 0)
+    ui->waveform->refreshData();
 }
 
 PhasePlotPage::~PhasePlotPage()
