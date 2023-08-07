@@ -42,6 +42,7 @@ PhasePlotPageConfig::deserialize(Suscan::Object const &conf)
   LOAD(logEvents);
   LOAD(measurementTime);
   LOAD(coherenceThreshold);
+  LOAD(maxAlloc);
 }
 
 Suscan::Object &&
@@ -58,6 +59,7 @@ PhasePlotPageConfig::serialize()
   STORE(logEvents);
   STORE(measurementTime);
   STORE(coherenceThreshold);
+  STORE(maxAlloc);
 
   return persist(obj);
 }
@@ -83,6 +85,7 @@ PhasePlotPage::PhasePlotPage(
 
   ui->savePlotButton->setEnabled(false);
 
+  m_data.reserve(1 << 10);
   m_detector = new CoherentDetector();
 
   connectAll();
@@ -140,6 +143,12 @@ PhasePlotPage::connectAll()
         SLOT(onChangePhaseOrigin()));
 
   connect(
+        ui->maxAllocMiBSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onMaxAllocChanged()));
+
+  connect(
         ui->measurementTimeSpin,
         SIGNAL(changed(qreal,qreal)),
         this,
@@ -168,7 +177,6 @@ PhasePlotPage::connectAll()
         SIGNAL(clicked(bool)),
         this,
         SLOT(onClearLog()));
-
 }
 
 void
@@ -192,6 +200,7 @@ void
 PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT size)
 {
   SUSCOUNT ptr = 0, got;
+  SUSCOUNT newSize, newAlloc;
 
   for (SUSCOUNT i = 0; i < size; ++i)
     m_accumulated += data[i];
@@ -205,16 +214,49 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
     bool first = m_data.size() == 0;
     SUSCOUNT orig = m_data.size();
 
+    // Ensure size and rollover
+    newSize = orig + size;
+    if (newSize > m_data.capacity()) {
+      // Time to reallocate!
+      size_t maxAlloc = m_config->maxAlloc / sizeof(SUCOMPLEX);
+      ui->waveform->safeCancel();
+
+      // Ideally, attempt to double capacity
+      newAlloc = 2 * m_data.capacity();
+
+      if (newAlloc <= maxAlloc) {
+        // We can
+        m_data.reserve(newAlloc);
+      } else {
+        // We are hiting the limit, is it enough?
+        if (newSize < maxAlloc) {
+          // Yes
+          m_data.reserve(maxAlloc);
+        } else {
+          // No, rollover
+          logText(
+                "Maximum buffer size reached (" +
+                SuWidgetsHelpers::formatBinaryQuantity(maxAlloc * sizeof(SUCOMPLEX)) +
+                "), clearing buffer");
+          orig = 0;
+        }
+      }
+    }
+
+    if (orig == 0)
+      clearData();
+
     m_data.resize(orig + size);
+
     for (SUSCOUNT i = 0; i < size; ++i)
       m_data[i + orig] = data[i] * m_phaseAdjust;
 
-    ui->waveform->refreshData();
-
     if (first) {
-      ui->waveform->zoomHorizontal(SCAST(qint64, 0), SCAST(qint64, 50000));
+      ui->waveform->zoomHorizontal(0., 10.);
       ui->savePlotButton->setEnabled(true);
+      ui->waveform->refreshData();
     }
+
     ui->phaseView->feed(data, size);
   }
 
@@ -271,7 +313,7 @@ PhasePlotPage::clearData()
 {
   qint64 size = m_data.size() * sizeof(SUCOMPLEX);
 
-  m_data.clear();
+  m_data.resize(0);
   ui->savePlotButton->setEnabled(false);
   ui->waveform->refreshData();
 
@@ -366,6 +408,7 @@ PhasePlotPage::refreshUi()
   BLOCKSIG(ui->enableLoggerButton,     setChecked(m_config->logEvents));
   BLOCKSIG(ui->measurementTimeSpin,    setTimeValue(m_config->measurementTime));
   BLOCKSIG(ui->coherenceThresholdSpin, setValue(m_config->coherenceThreshold));
+  BLOCKSIG(ui->maxAllocMiBSpin,        setValue(m_config->maxAlloc / (1 << 20)));
 
   ui->gainSpin->setEnabled(!m_config->autoFit);
   ui->waveform->setAutoFitToEnvelope(m_config->autoFit);
@@ -374,6 +417,8 @@ PhasePlotPage::refreshUi()
   if (!m_config->autoFit) {
     m_gain = SU_POWER_MAG_RAW(m_config->gainDb);
     qreal limits = 1 / m_gain;
+
+
     ui->waveform->zoomVertical(-limits, +limits);
     ui->phaseView->setGain(m_gain);
   }
@@ -424,11 +469,14 @@ PhasePlotPage::setTimeStamp(struct timeval const &ts)
   // Update buffer size
   ui->sizeLabel->setText(
         SuWidgetsHelpers::formatBinaryQuantity(
-          m_data.size() * sizeof(SUCOMPLEX)));
+          m_data.capacity() * sizeof(SUCOMPLEX)));
+
+  ui->waveform->refreshData();
 }
 
 PhasePlotPage::~PhasePlotPage()
 {
+  ui->waveform->safeCancel();
   delete m_detector;
   delete ui;
 }
@@ -459,6 +507,26 @@ PhasePlotPage::onClear()
 {
   clearData();
 }
+
+void
+PhasePlotPage::onMaxAllocChanged()
+{
+  bool flush = false;
+  m_config->maxAlloc = ui->maxAllocMiBSpin->value() * (1 << 20);
+
+  ui->waveform->safeCancel();
+
+  if (m_data.size() > m_config->maxAlloc) {
+    flush = true;
+    m_data.resize(0);
+  }
+
+  m_data.reserve(m_config->maxAlloc / sizeof(SUCOMPLEX));
+
+  if (flush)
+    ui->waveform->setData(&m_data, true, true);
+}
+
 
 void
 PhasePlotPage::onAutoFitToggled()

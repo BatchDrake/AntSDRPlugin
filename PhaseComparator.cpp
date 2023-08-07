@@ -516,5 +516,5 @@ PhaseComparator::onClosePlotPage()
     m_comparator->close();
   }
 
-  sender->deleteLater();
+  delete sender;
 }

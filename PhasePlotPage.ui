@@ -428,6 +428,9 @@
         <property name="text">
          <string>XXX.XXX MiB</string>
         </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
        </widget>
       </item>
       <item row="1" column="2" colspan="3">
@@ -436,7 +439,7 @@
       <item row="0" column="2" colspan="3">
        <widget class="FrequencySpinBox" name="freqSpin"/>
       </item>
-      <item row="3" column="2" colspan="3">
+      <item row="3" column="2">
        <widget class="ContextAwareSpinBox" name="phaseOriginSpin">
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -452,6 +455,44 @@
         </property>
         <property name="maximum">
          <double>180.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="3">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Max alloc</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="4">
+       <widget class="ContextAwareSpinBox" name="maxAllocMiBSpin">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <family>Monospace</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+        <property name="suffix">
+         <string> MiB</string>
+        </property>
+        <property name="decimals">
+         <number>2</number>
+        </property>
+        <property name="maximum">
+         <double>131072.000000000000000</double>
         </property>
        </widget>
       </item>
