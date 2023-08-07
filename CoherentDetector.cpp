@@ -59,6 +59,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
   bool triggered;
   SUFLOAT ang, accum, power;
   SUCOMPLEX prev;
+  SUCOMPLEX iqAcc;
 
   count = m_count;
   triggered = m_triggered;
@@ -73,6 +74,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
   prev  = m_prev;
   accum = m_angDeltaAcc;
   power = m_powerAcc;
+  iqAcc = m_iqAcc;
 
   // Demodulate
   for (size_t i = 0; i < size; ++i) {
@@ -80,6 +82,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
     ang    = SU_C_ARG(data[i] * SU_C_CONJ(prev));
     accum += ang * ang;
     prev   = data[i];
+    iqAcc += data[i];
   }
 
   m_prev        = prev;
@@ -90,6 +93,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
   if (triggered) {
     m_powerCount += size;
     m_powerAcc    = power;
+    m_iqAcc       = iqAcc;
   }
 
   // Detect
@@ -100,11 +104,13 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
       if (accum > 4 * m_threshold2) {
         if (m_powerCount > 0) {
           m_lastPower = m_powerAcc / m_powerCount;
+          m_lastPhase = SU_C_ARG(m_iqAcc);
           m_haveEvent = true;
         }
 
         m_powerAcc   = 0;
         m_powerCount = 0;
+        m_iqAcc      = 0;
         m_triggered  = false;
       }
     } else {
@@ -113,6 +119,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
         m_powerAcc   = power;
         m_powerCount = size;
         m_haveEvent  = false;
+        m_iqAcc      = iqAcc;
       }
     }
     accum = 0;
@@ -135,6 +142,12 @@ SUFLOAT
 CoherentDetector::lastPower() const
 {
   return m_lastPower;
+}
+
+SUFLOAT
+CoherentDetector::lastPhase() const
+{
+  return m_lastPhase;
 }
 
 bool

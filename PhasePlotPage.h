@@ -39,6 +39,7 @@ namespace SigDigger {
     float measurementTime    = .2;
     float coherenceThreshold = 10.;
     double maxAlloc          = 256 * (1 << 20);
+    bool   angleOfArrival    = false;
 
     // Overriden methods
     void deserialize(Suscan::Object const &conf) override;
@@ -113,6 +114,7 @@ namespace SigDigger {
     void onClear();
     void onMaxAllocChanged();
     void onAutoFitToggled();
+    void onAoAToggled();
     void onGainChanged();
     void onChangeFrequency();
     void onChangeBandwidth();

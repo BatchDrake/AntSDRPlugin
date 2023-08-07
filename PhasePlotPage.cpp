@@ -43,6 +43,7 @@ PhasePlotPageConfig::deserialize(Suscan::Object const &conf)
   LOAD(measurementTime);
   LOAD(coherenceThreshold);
   LOAD(maxAlloc);
+  LOAD(angleOfArrival);
 }
 
 Suscan::Object &&
@@ -60,6 +61,7 @@ PhasePlotPageConfig::serialize()
   STORE(measurementTime);
   STORE(coherenceThreshold);
   STORE(maxAlloc);
+  STORE(angleOfArrival);
 
   return persist(obj);
 }
@@ -105,6 +107,12 @@ PhasePlotPage::connectAll()
         SIGNAL(toggled(bool)),
         this,
         SLOT(onAutoScrollToggled()));
+
+  connect(
+        ui->phaseAoAButton,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onAoAToggled()));
 
   connect(
         ui->clearButton,
@@ -277,17 +285,44 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
           logText(time, "Coherent event detected.");
         } else {
           if (m_detector->haveEvent()) {
+            QString phaseInfoText;
             timersub(&time, &m_lastEvent, &delta);
             qreal asSeconds = delta.tv_sec + delta.tv_usec * 1e-6;
+
+            if (m_config->angleOfArrival) {
+              qreal aoa1, aoa2;
+
+              aoa1 = -SU_ASIN(m_detector->lastPhase() / M_PI);
+              aoa2 = M_PI - aoa1;
+
+              phaseInfoText =
+                  "AoA = " + SuWidgetsHelpers::formatQuantity(
+                    SU_RAD2DEG(aoa1),
+                    4,
+                    "deg",
+                    true) +
+                  " or " + SuWidgetsHelpers::formatQuantity(
+                    SU_RAD2DEG(aoa2),
+                    4,
+                    "deg",
+                    true);
+            } else {
+              phaseInfoText =
+                  "dPhi = " +SuWidgetsHelpers::formatQuantity(
+                    SU_RAD2DEG(m_detector->lastPhase()),
+                    4,
+                    "º");
+            }
+
             logText(
                   time,
-                  "Coherent event end. Duration = " +
+                  "Coherent event end. T = " +
                   SuWidgetsHelpers::formatQuantity(asSeconds, 4, "s") +
-                  ", power = " +
+                  ", S = " +
                   QString::number(SU_POWER_DB_RAW(m_detector->lastPower())) +
-                  " dB");
+                  " dB, " +
+                  phaseInfoText);
           }
-
         }
       }
       ptr += got;
@@ -395,6 +430,8 @@ PhasePlotPage::setColorConfig(ColorConfig const &cfg)
   ui->waveform->setSelectionColor(cfg.selection);
 
   ui->phaseView->setBackgroundColor(cfg.spectrumBackground);
+  ui->phaseView->setForegroundColor(cfg.spectrumForeground);
+
   ui->phaseView->setAxesColor(cfg.spectrumAxes);
 }
 
@@ -414,7 +451,9 @@ PhasePlotPage::refreshUi()
   BLOCKSIG(ui->measurementTimeSpin,    setTimeValue(m_config->measurementTime));
   BLOCKSIG(ui->coherenceThresholdSpin, setValue(m_config->coherenceThreshold));
   BLOCKSIG(ui->maxAllocMiBSpin,        setValue(m_config->maxAlloc / (1 << 20)));
+  BLOCKSIG(ui->phaseAoAButton,         setChecked(m_config->angleOfArrival));
 
+  ui->phaseView->setAoA(m_config->angleOfArrival);
   ui->gainSpin->setEnabled(!m_config->autoFit);
   ui->waveform->setAutoFitToEnvelope(m_config->autoFit);
   ui->waveform->setAutoScroll(m_config->autoScroll);
@@ -591,6 +630,13 @@ PhasePlotPage::onLogEnableToggled()
   m_config->logEvents = ui->enableLoggerButton->isChecked();
   m_detector->reset();
   m_haveEvent = false;
+}
+
+void
+PhasePlotPage::onAoAToggled()
+{
+  m_config->angleOfArrival = ui->phaseAoAButton->isChecked();
+  refreshUi();
 }
 
 void

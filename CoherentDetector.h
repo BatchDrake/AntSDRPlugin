@@ -37,9 +37,11 @@ namespace SigDigger {
   class CoherentDetector
   {
     SUCOMPLEX              m_prev = 1;
+    SUCOMPLEX              m_iqAcc = 0;
     SUFLOAT                m_angDeltaAcc = 0;
     SUFLOAT                m_powerAcc = 0;
     SUFLOAT                m_lastPower = 0;
+    SUFLOAT                m_lastPhase = 0;
     size_t                 m_count = 0;
     size_t                 m_size = 0;
     size_t                 m_powerCount = 0;
@@ -57,6 +59,7 @@ namespace SigDigger {
 
     size_t feed(const SUCOMPLEX *, size_t);
     bool  triggered() const;
+    SUFLOAT lastPhase() const;
     SUFLOAT lastPower() const;
     bool  haveEvent() const;
   };
