@@ -31,15 +31,17 @@ namespace SigDigger {
 
   class PhasePlotPageConfig : public Suscan::Serializable {
   public:
-    bool  autoFit            = true;
-    bool  autoScroll         = true;
-    float gainDb             = 0;
-    float phaseOrigin        = 0;
-    bool  logEvents          = false;
-    float measurementTime    = .2;
-    float coherenceThreshold = 10.;
-    double maxAlloc          = 256 * (1 << 20);
-    bool   angleOfArrival    = false;
+    bool   autoFit            = true;
+    bool   autoScroll         = true;
+    float  gainDb             = 0;
+    float  phaseOrigin        = 0;
+    bool   logEvents          = false;
+    float  measurementTime    = .2;
+    float  coherenceThreshold = 10.;
+    double maxAlloc           = 256 * (1 << 20);
+    bool   angleOfArrival     = false;
+    bool   autoSave           = false;
+    std::string saveDir       = "";
 
     // Overriden methods
     void deserialize(Suscan::Object const &conf) override;
@@ -63,6 +65,9 @@ namespace SigDigger {
     SUFLOAT   m_gain = 1;
     SUCOMPLEX m_phaseAdjust = 1;
 
+    FILE     *m_autoSaveFp = nullptr;
+    SUSCOUNT  m_savedSize  = 0;
+
     struct timeval m_lastTimeStamp;
     struct timeval m_lastEvent;
     bool      m_infoLogged = false;
@@ -81,10 +86,15 @@ namespace SigDigger {
         UIMediator *,
         QWidget *parent = nullptr);
 
-    ~PhasePlotPage();
+    ~PhasePlotPage() override;
 
     void feed(struct timeval const &tv, const SUCOMPLEX *, SUSCOUNT);
     void setFreqencyLimits(SUFREQ min, SUFREQ max);
+
+    QString genAutoSaveFileName() const;
+
+    void abortAutoSaveFile(int error);
+    void cycleAutoSaveFile();
 
     void setProperties(
         PhaseComparator *,
@@ -124,6 +134,9 @@ namespace SigDigger {
     void onLogEnableToggled();
     void onSaveLog();
     void onClearLog();
+
+    void onToggleAutoSave();
+    void onBrowseSaveDir();
   };
 
 }

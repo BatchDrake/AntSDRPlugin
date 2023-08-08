@@ -25,8 +25,15 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTextStream>
+#include <QDir>
+#include <QFile>
 
 using namespace SigDigger;
+
+// Yay Qt6
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#  define DirectoryOnly Directory
+#endif
 
 #define STRINGFY(x) #x
 #define STORE(field) obj.set(STRINGFY(field), this->field)
@@ -44,6 +51,11 @@ PhasePlotPageConfig::deserialize(Suscan::Object const &conf)
   LOAD(coherenceThreshold);
   LOAD(maxAlloc);
   LOAD(angleOfArrival);
+  LOAD(autoSave);
+  LOAD(saveDir);
+
+  if (saveDir == "")
+    saveDir = QDir::currentPath().toStdString();
 }
 
 Suscan::Object &&
@@ -62,6 +74,8 @@ PhasePlotPageConfig::serialize()
   STORE(coherenceThreshold);
   STORE(maxAlloc);
   STORE(angleOfArrival);
+  STORE(autoSave);
+  STORE(saveDir);
 
   return persist(obj);
 }
@@ -185,6 +199,108 @@ PhasePlotPage::connectAll()
         SIGNAL(clicked(bool)),
         this,
         SLOT(onClearLog()));
+
+  connect(
+        ui->saveBufferCheck,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onToggleAutoSave()));
+
+  connect(
+        ui->browseButton,
+        SIGNAL(clicked(bool)),
+        this,
+        SLOT(onBrowseSaveDir()));
+}
+
+QString
+PhasePlotPage::genAutoSaveFileName() const
+{
+  char datetime[17];
+  time_t unixtime;
+  struct tm tm;
+  unixtime = time(nullptr);
+  gmtime_r(&unixtime, &tm);
+  strftime(datetime, sizeof(datetime), "%Y%m%d", &tm);
+
+  QString prefix    = "phasediff";
+  QString frequency = QString::number(ui->freqSpin->value());
+  QString bandwidth = QString::number(ui->bwSpin->value());
+  unsigned int number = 1;
+  QString hint;
+  QString dateStamp = datetime;
+  QString dir = QString::fromStdString(m_config->saveDir);
+
+  do {
+    hint = prefix + "_"
+        + dateStamp + "_"
+        + frequency + "_"
+        + bandwidth + "_"
+        + QString::asprintf("%04d", number) + ".raw";
+    ++number;
+  } while (QFile::exists(dir + "/" + hint));
+
+  return hint;
+}
+
+static void
+setElidedLabelText(QLabel *label, QString text)
+{
+    QFontMetrics metrix(label->font());
+    int width = label->width() - 2;
+    QString clippedText = metrix.elidedText(text, Qt::ElideMiddle, width);
+    label->setText(clippedText);
+}
+
+void
+PhasePlotPage::abortAutoSaveFile(int error)
+{
+  if (m_autoSaveFp) {
+    fclose(m_autoSaveFp);
+    m_autoSaveFp = nullptr;
+    m_savedSize  = 0;
+  }
+
+  m_config->autoSave = false;
+
+  if (error == 0) {
+    ui->currentFileLabel->setText("None");
+    ui->statusLabel->setText("Save aborted: written less data than expected");
+  } else {
+    ui->currentFileLabel->setText("None");
+    ui->statusLabel->setText("Save aborted: " + QString(strerror(errno)));
+  }
+
+  refreshUi();
+}
+
+void
+PhasePlotPage::cycleAutoSaveFile()
+{
+  bool shouldHaveFile = m_config->autoSave;
+
+  if (m_autoSaveFp != nullptr) {
+    fclose(m_autoSaveFp);
+    m_autoSaveFp = nullptr;
+    m_savedSize  = 0;
+  }
+
+  if (shouldHaveFile) {
+    QString filename = genAutoSaveFileName();
+    std::string asString = m_config->saveDir + "/" + filename.toStdString();
+
+    m_autoSaveFp = fopen(asString.c_str(), "wb");
+    if (m_autoSaveFp != nullptr) {
+      setElidedLabelText(ui->currentFileLabel, filename);
+      ui->statusLabel->setText("Saving data");
+    } else {
+      ui->currentFileLabel->setText("None");
+      ui->statusLabel->setText("Error: " + QString(strerror(errno)));
+    }
+  } else {
+    ui->currentFileLabel->setText("None");
+    ui->statusLabel->setText("Idle");
+  }
 }
 
 void
@@ -209,6 +325,15 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
 {
   SUSCOUNT ptr = 0, got;
   SUSCOUNT newSize, newAlloc;
+
+  if (m_autoSaveFp) {
+    errno = 0;
+    auto ret = fwrite(data, sizeof(SUCOMPLEX), size, m_autoSaveFp);
+    if (ret != size)
+      abortAutoSaveFile(errno);
+    else
+      m_savedSize += size * sizeof(SUCOMPLEX);
+  }
 
   for (SUSCOUNT i = 0; i < size; ++i)
     m_accumulated += data[i];
@@ -452,6 +577,8 @@ PhasePlotPage::refreshUi()
   BLOCKSIG(ui->coherenceThresholdSpin, setValue(m_config->coherenceThreshold));
   BLOCKSIG(ui->maxAllocMiBSpin,        setValue(m_config->maxAlloc / (1 << 20)));
   BLOCKSIG(ui->phaseAoAButton,         setChecked(m_config->angleOfArrival));
+  BLOCKSIG(ui->saveDirEdit,            setText(QString::fromStdString(m_config->saveDir)));
+  BLOCKSIG(ui->saveBufferCheck,        setChecked(m_config->autoSave));
 
   ui->phaseView->setAoA(m_config->angleOfArrival);
   ui->gainSpin->setEnabled(!m_config->autoFit);
@@ -476,6 +603,8 @@ PhasePlotPage::applyConfig(void)
   m_phaseAdjust = SU_C_EXP(-SU_I * SU_DEG2RAD(m_config->phaseOrigin));
   m_detector->resize(m_config->measurementTime * m_sampRate);
   m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
+
+  cycleAutoSaveFile();
 }
 
 void
@@ -517,6 +646,12 @@ PhasePlotPage::setTimeStamp(struct timeval const &ts)
 
   if (m_data.size() > 0)
     ui->waveform->refreshData();
+
+  if (m_autoSaveFp != nullptr)
+    ui->statusLabel->setText(
+          "Saving data ("
+          + SuWidgetsHelpers::formatBinaryQuantity(SCAST(qint64, m_savedSize))
+          + ")");
 }
 
 PhasePlotPage::~PhasePlotPage()
@@ -551,6 +686,7 @@ void
 PhasePlotPage::onClear()
 {
   clearData();
+  cycleAutoSaveFile();
 }
 
 void
@@ -686,4 +822,28 @@ PhasePlotPage::onClearLog()
 {
   ui->logTextEdit->clear();
   m_infoLogged = false;
+}
+
+void
+PhasePlotPage::onToggleAutoSave()
+{
+  m_config->autoSave = ui->saveBufferCheck->isChecked();
+  cycleAutoSaveFile();
+}
+
+void
+PhasePlotPage::onBrowseSaveDir()
+{
+  QFileDialog dialog(this);
+
+  dialog.setFileMode(QFileDialog::DirectoryOnly);
+  dialog.setAcceptMode(QFileDialog::AcceptOpen);
+  dialog.setWindowTitle(QString("Select current save directory"));
+
+  if (dialog.exec()) {
+    QString path = dialog.selectedFiles().first();
+    m_config->saveDir = path.toStdString();
+    refreshUi();
+    cycleAutoSaveFile();
+  }
 }
