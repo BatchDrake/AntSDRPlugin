@@ -211,6 +211,12 @@ PhasePlotPage::connectAll()
         SIGNAL(clicked(bool)),
         this,
         SLOT(onBrowseSaveDir()));
+
+  connect(
+        ui->waveform,
+        SIGNAL(horizontalSelectionChanged(qreal, qreal)),
+        this,
+        SLOT(onHSelection(qreal, qreal)));
 }
 
 QString
@@ -390,7 +396,8 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
       ui->waveform->refreshData();
     }
 
-    ui->phaseView->feed(data, size);
+    if (!m_haveSelection)
+      ui->phaseView->feed(data, size);
   }
 
   if (m_config->logEvents && m_detector->enabled()) {
@@ -469,6 +476,15 @@ PhasePlotPage::logDetectorInfo()
 }
 
 void
+PhasePlotPage::plotSelectionPhase(qint64 start, qint64 end)
+{
+  size_t sBegin = qBound(SCAST(size_t, 0), SCAST(size_t, start), m_data.size());
+  size_t sEnd   = qBound(SCAST(size_t, 0), SCAST(size_t, end), m_data.size());
+
+  ui->phaseView->feed(m_data.data() + sBegin, SCAST(unsigned, sEnd - sBegin));
+}
+
+void
 PhasePlotPage::clearData()
 {
   qint64 size = m_data.size() * sizeof(SUCOMPLEX);
@@ -488,6 +504,8 @@ PhasePlotPage::clearData()
           "Data buffer cleared after a capture of " +
           SuWidgetsHelpers::formatBinaryQuantity(size));
   }
+
+  refreshMeasurements();
 }
 
 void
@@ -596,6 +614,109 @@ PhasePlotPage::refreshUi()
 }
 
 void
+PhasePlotPage::showEvent(QShowEvent *)
+{
+  ui->phaseView->setMinimumWidth(ui->actionsWidget->height());
+  ui->phaseView->setMinimumHeight(ui->actionsWidget->height());
+
+  ui->phaseView->setMaximumWidth(ui->actionsWidget->height());
+  ui->phaseView->setMaximumHeight(ui->actionsWidget->height());
+}
+
+void
+PhasePlotPage::refreshMeasurements()
+{
+  qreal selStart = 0;
+  qreal selEnd   = 0;
+  qreal deltaT;
+  WaveLimits limits;
+  SUCOMPLEX mean;
+  SUFLOAT phase, angle;
+
+  bool selection = false;
+
+  if (ui->waveform->getHorizontalSelectionPresent()) {
+    size_t length = ui->waveform->getDataLength();
+    selStart = ui->waveform->getHorizontalSelectionStart();
+    selEnd   = ui->waveform->getHorizontalSelectionEnd();
+
+    if (selStart < 0)
+      selStart = 0;
+    if (selEnd > SCAST(qreal, length))
+      selEnd = SCAST(qreal, length);
+
+    selection = selEnd - selStart > 0 && ui->waveform->isComplete();
+  }
+
+  m_haveSelection = selection;
+
+  // Simple case: no selection
+  if (!selection) {
+    ui->selStartLabel->setText("N/A");
+    ui->selEndLabel->setText("N/A");
+    ui->selLengthLabel->setText("N/A");
+
+    ui->meanPhaseLabel->setText("N/A");
+    ui->meanAngle1Label->setText("N/A");
+    ui->meanAngle2Label->setText("N/A");
+
+    return;
+  }
+
+  plotSelectionPhase(SCAST(qint64, selStart), SCAST(qint64, selEnd));
+
+  ui->waveform->computeLimits(
+        SCAST(qint64, selStart),
+        SCAST(qint64, selEnd),
+        limits);
+
+  mean = limits.mean;
+  deltaT = 1. / SCAST(qreal, m_sampRate);
+
+  ui->selStartLabel->setText(
+        SuWidgetsHelpers::formatQuantityFromDelta(
+          ui->waveform->samp2t(selStart),
+          deltaT,
+          "s",
+          true)
+        + " (" + SuWidgetsHelpers::formatReal(selStart) + ")");
+  ui->selEndLabel->setText(
+        SuWidgetsHelpers::formatQuantityFromDelta(
+          ui->waveform->samp2t(selEnd),
+          deltaT,
+          "s",
+          true)
+        + " (" + SuWidgetsHelpers::formatReal(selEnd) + ")");
+
+  ui->selLengthLabel->setText(
+        SuWidgetsHelpers::formatQuantityFromDelta(
+          (selEnd - selStart) * deltaT,
+          deltaT,
+          "s"));
+
+  phase = SU_C_ARG(mean);
+  ui->meanPhaseLabel->setText(
+        SuWidgetsHelpers::formatQuantity(SU_RAD2DEG(phase), 4, "º"));
+
+  angle = -SU_ASIN(phase / M_PI);
+  ui->meanAngle1Label->setText(
+        SuWidgetsHelpers::formatQuantity(
+          SU_RAD2DEG(angle),
+          4,
+          "deg",
+          true));
+
+  angle = M_PI - angle;
+  ui->meanAngle2Label->setText(
+        SuWidgetsHelpers::formatQuantity(
+          SU_RAD2DEG(angle),
+          4,
+          "deg",
+          true));
+}
+
+
+void
 PhasePlotPage::applyConfig(void)
 {
   refreshUi();
@@ -605,6 +726,7 @@ PhasePlotPage::applyConfig(void)
   m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
 
   cycleAutoSaveFile();
+  refreshMeasurements();
 }
 
 void
@@ -846,4 +968,10 @@ PhasePlotPage::onBrowseSaveDir()
     refreshUi();
     cycleAutoSaveFile();
   }
+}
+
+void
+PhasePlotPage::onHSelection(qreal, qreal)
+{
+  refreshMeasurements();
 }

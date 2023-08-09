@@ -20,6 +20,7 @@
 #define PHASEPLOTPAGE_H
 
 #include <TabWidgetFactory.h>
+#include <QShowEvent>
 
 namespace Ui {
   class PhasePlotPage;
@@ -72,13 +73,18 @@ namespace SigDigger {
     struct timeval m_lastEvent;
     bool      m_infoLogged = false;
     bool      m_haveEvent = false;
+    bool      m_haveSelection = false;
 
+    void refreshMeasurements();
     void logDetectorInfo();
     void clearData();
     void refreshUi();
+    void plotSelectionPhase(qint64, qint64);
     void connectAll();
     void logText(QString const &);
     void logText(struct timeval const &, QString const &);
+
+    void showEvent(QShowEvent *) override;
 
   public:
     explicit PhasePlotPage(
@@ -137,6 +143,7 @@ namespace SigDigger {
 
     void onToggleAutoSave();
     void onBrowseSaveDir();
+    void onHSelection(qreal, qreal);
   };
 
 }
