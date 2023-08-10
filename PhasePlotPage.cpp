@@ -397,7 +397,7 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
     }
 
     if (!m_haveSelection)
-      ui->phaseView->feed(data, size);
+      ui->phaseView->feed(&m_data[orig], SCAST(unsigned, size));
   }
 
   if (m_config->logEvents && m_detector->enabled()) {
@@ -597,6 +597,7 @@ PhasePlotPage::refreshUi()
   BLOCKSIG(ui->phaseAoAButton,         setChecked(m_config->angleOfArrival));
   BLOCKSIG(ui->saveDirEdit,            setText(QString::fromStdString(m_config->saveDir)));
   BLOCKSIG(ui->saveBufferCheck,        setChecked(m_config->autoSave));
+  BLOCKSIG(ui->phaseOriginSpin,        setValue(m_config->phaseOrigin));
 
   ui->phaseView->setAoA(m_config->angleOfArrival);
   ui->gainSpin->setEnabled(!m_config->autoFit);
