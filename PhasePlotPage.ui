@@ -61,13 +61,6 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0" colspan="2">
-       <widget class="QPushButton" name="clearButton">
-        <property name="text">
-         <string>&amp;Clear plot</string>
-        </property>
-       </widget>
-      </item>
       <item row="8" column="1">
        <widget class="ContextAwareSpinBox" name="gainSpin">
         <property name="sizePolicy">
@@ -133,6 +126,23 @@
        <widget class="QPushButton" name="phaseAoAButton">
         <property name="text">
          <string>&amp;Phase/AoA</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="clearButton">
+        <property name="text">
+         <string>&amp;Clear plot</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QPushButton" name="enablePlotButton">
+        <property name="text">
+         <string>&amp;Enable plot</string>
         </property>
         <property name="checkable">
          <bool>true</bool>

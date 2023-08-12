@@ -53,6 +53,7 @@ PhasePlotPageConfig::deserialize(Suscan::Object const &conf)
   LOAD(angleOfArrival);
   LOAD(autoSave);
   LOAD(saveDir);
+  LOAD(doPlot);
 
   if (saveDir == "")
     saveDir = QDir::currentPath().toStdString();
@@ -76,6 +77,7 @@ PhasePlotPageConfig::serialize()
   STORE(angleOfArrival);
   STORE(autoSave);
   STORE(saveDir);
+  STORE(doPlot);
 
   return persist(obj);
 }
@@ -121,6 +123,12 @@ PhasePlotPage::connectAll()
         SIGNAL(toggled(bool)),
         this,
         SLOT(onAutoScrollToggled()));
+
+  connect(
+        ui->enablePlotButton,
+        SIGNAL(toggled(bool)),
+        this,
+        SLOT(onEnablePlotToggled()));
 
   connect(
         ui->phaseAoAButton,
@@ -230,7 +238,7 @@ PhasePlotPage::genAutoSaveFileName() const
   strftime(datetime, sizeof(datetime), "%Y%m%d", &tm);
 
   QString prefix    = "phasediff";
-  QString frequency = QString::number(ui->freqSpin->value());
+  QString frequency = QString::number(SCAST(qint64, ui->freqSpin->value()));
   QString bandwidth = QString::number(ui->bwSpin->value());
   unsigned int number = 1;
   QString hint;
@@ -393,7 +401,9 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
     if (first) {
       ui->waveform->zoomHorizontal(0., 10.);
       ui->savePlotButton->setEnabled(true);
-      ui->waveform->refreshData();
+
+      if (m_config->doPlot)
+        ui->waveform->refreshData();
     }
 
     if (!m_haveSelection)
@@ -589,6 +599,7 @@ PhasePlotPage::refreshUi()
 {
   BLOCKSIG(ui->autoFitButton,          setChecked(m_config->autoFit));
   BLOCKSIG(ui->autoScrollButton,       setChecked(m_config->autoScroll));
+  BLOCKSIG(ui->enablePlotButton,       setChecked(m_config->doPlot));
   BLOCKSIG(ui->gainSpin,               setValue(m_config->gainDb));
   BLOCKSIG(ui->enableLoggerButton,     setChecked(m_config->logEvents));
   BLOCKSIG(ui->measurementTimeSpin,    setTimeValue(m_config->measurementTime));
@@ -603,6 +614,11 @@ PhasePlotPage::refreshUi()
   ui->gainSpin->setEnabled(!m_config->autoFit);
   ui->waveform->setAutoFitToEnvelope(m_config->autoFit);
   ui->waveform->setAutoScroll(m_config->autoScroll);
+
+  if (m_config->doPlot)
+    ui->waveform->setData(&m_data, true, true);
+  else
+    ui->waveform->setData(&m_empty, true, false);
 
   if (!m_config->autoFit) {
     m_gain = SU_POWER_MAG_RAW(m_config->gainDb);
@@ -757,6 +773,7 @@ PhasePlotPage::setTimeStamp(struct timeval const &ts)
     if (adjust) {
       m_config->gainDb = SU_POWER_DB_RAW(gain);
       BLOCKSIG(ui->gainSpin, setValue(m_config->gainDb));
+      ui->phaseView->setGain(gain);
     }
 
     m_accumCount = 0;
@@ -813,6 +830,13 @@ PhasePlotPage::onClear()
 }
 
 void
+PhasePlotPage::onEnablePlotToggled()
+{
+  m_config->doPlot = ui->enablePlotButton->isChecked();
+  refreshUi();
+}
+
+void
 PhasePlotPage::onMaxAllocChanged()
 {
   bool flush = false;
@@ -828,7 +852,7 @@ PhasePlotPage::onMaxAllocChanged()
   m_data.reserve(m_config->maxAlloc / sizeof(SUCOMPLEX));
 
   if (flush)
-    ui->waveform->setData(&m_data, true, true);
+    ui->waveform->setData(&m_data, true, m_config->doPlot);
 }
 
 

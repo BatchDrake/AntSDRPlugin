@@ -292,7 +292,7 @@ SimplePhaseComparator::onDataAvailable()
       m_lastBuffer.resize(bufLo.size());
 
       for (size_t i = 0; i < bufLo.size(); ++i)
-        m_lastBuffer[i] = bufLo[i] * SU_C_CONJ(bufHi[i]);
+        m_lastBuffer[i] = bufLo[i] * SU_C_CONJ(-bufHi[i]);
       m_loAvail = m_hiAvail = false;
 
       emit dataAvailable();

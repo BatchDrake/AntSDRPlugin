@@ -34,6 +34,7 @@ namespace SigDigger {
   public:
     bool   autoFit            = true;
     bool   autoScroll         = true;
+    bool   doPlot             = true;
     float  gainDb             = 0;
     float  phaseOrigin        = 0;
     bool   logEvents          = false;
@@ -59,6 +60,8 @@ namespace SigDigger {
     PhasePlotPageConfig *m_config = nullptr;
 
     std::vector<SUCOMPLEX> m_data;
+    std::vector<SUCOMPLEX> m_empty;
+
     SUFLOAT   m_sampRate;
     SUCOMPLEX m_accumulated;
     SUSCOUNT  m_accumCount = 0;
@@ -127,6 +130,7 @@ namespace SigDigger {
   public slots:
     void onSavePlot();
     void onAutoScrollToggled();
+    void onEnablePlotToggled();
     void onClear();
     void onMaxAllocChanged();
     void onAutoFitToggled();
