@@ -74,6 +74,9 @@ namespace SigDigger {
 
     struct timeval m_lastTimeStamp;
     struct timeval m_lastEvent;
+    struct timeval m_firstSamples;
+
+    bool      m_haveFirstSamples = false;
     bool      m_infoLogged = false;
     bool      m_haveEvent = false;
     bool      m_haveSelection = false;

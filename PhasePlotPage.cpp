@@ -231,15 +231,12 @@ QString
 PhasePlotPage::genAutoSaveFileName() const
 {
   char datetime[17];
-  time_t unixtime;
   struct tm tm;
-  unixtime = time(nullptr);
-  gmtime_r(&unixtime, &tm);
-  strftime(datetime, sizeof(datetime), "%Y%m%d", &tm);
+  gmtime_r(&m_firstSamples.tv_sec, &tm);
+  strftime(datetime, sizeof(datetime), "%Y%m%d_%H%M%S", &tm);
 
   QString prefix    = "phasediff";
   QString frequency = QString::number(SCAST(qint64, ui->freqSpin->value()));
-  QString bandwidth = QString::number(ui->bwSpin->value());
   unsigned int number = 1;
   QString hint;
   QString dateStamp = datetime;
@@ -249,7 +246,7 @@ PhasePlotPage::genAutoSaveFileName() const
     hint = prefix + "_"
         + dateStamp + "_"
         + frequency + "_"
-        + bandwidth + "_"
+        + QString::number(SCAST(qint64, m_sampRate)) + "sps_"
         + QString::asprintf("%04d", number) + ".raw";
     ++number;
   } while (QFile::exists(dir + "/" + hint));
@@ -340,7 +337,7 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
   SUSCOUNT ptr = 0, got;
   SUSCOUNT newSize, newAlloc;
 
-  if (m_autoSaveFp) {
+  if (m_autoSaveFp != nullptr) {
     errno = 0;
     auto ret = fwrite(data, sizeof(SUCOMPLEX), size, m_autoSaveFp);
     if (ret != size)
@@ -742,7 +739,6 @@ PhasePlotPage::applyConfig(void)
   m_detector->resize(m_config->measurementTime * m_sampRate);
   m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
 
-  cycleAutoSaveFile();
   refreshMeasurements();
 }
 
@@ -751,6 +747,12 @@ PhasePlotPage::setTimeStamp(struct timeval const &ts)
 {
   // Update gain
   m_lastTimeStamp = ts;
+
+  if (!m_haveFirstSamples) {
+    m_firstSamples = ts;
+    m_haveFirstSamples = true;
+    cycleAutoSaveFile();
+  }
 
   if (m_config->autoFit && m_accumCount > 0) {
     SUFLOAT mag, gain;
