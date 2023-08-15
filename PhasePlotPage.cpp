@@ -612,10 +612,14 @@ PhasePlotPage::refreshUi()
   ui->waveform->setAutoFitToEnvelope(m_config->autoFit);
   ui->waveform->setAutoScroll(m_config->autoScroll);
 
-  if (m_config->doPlot)
-    ui->waveform->setData(&m_data, true, true);
-  else
-    ui->waveform->setData(&m_empty, true, false);
+  if (!m_dataUpdated) {
+    m_dataUpdated = true;
+
+    if (m_config->doPlot)
+      ui->waveform->setData(&m_data, true, true);
+    else
+      ui->waveform->setData(&m_empty, true, false);
+  }
 
   if (!m_config->autoFit) {
     m_gain = SU_POWER_MAG_RAW(m_config->gainDb);
@@ -835,6 +839,7 @@ void
 PhasePlotPage::onEnablePlotToggled()
 {
   m_config->doPlot = ui->enablePlotButton->isChecked();
+  m_dataUpdated = false;
   refreshUi();
 }
 
