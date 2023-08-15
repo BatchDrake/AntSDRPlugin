@@ -377,6 +377,9 @@ suscan_source_ad9361_start(void *userdata)
   return SU_TRUE;
 }
 
+static const SUCOMPLEX g_nco0_out[] = {1., -I, -1, +I};
+static const SUCOMPLEX g_nco1_out[] = {1., +I, -1, -I};
+
 SUPRIVATE SUBOOL
 suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
 {
@@ -387,8 +390,6 @@ suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
   SUCOMPLEX mix0, mix1;
   int n_read;
   int ndx = self->nco_ndx;
-  SUCOMPLEX nco0_out[] = {1., -I, -1, +I};
-  SUCOMPLEX nco1_out[] = {1., +I, -1, -I};
 
   n_read = iio_buffer_refill(self->rx_buf);
   if (n_read < 0)
@@ -411,9 +412,9 @@ suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
     rx1 = (data[j | 2] + I * data[j | 3]) / 32768.;
 
     /* Just tell me you don't love how these channels are combined */
-    mix0 = nco0_out[ndx];
-    mix1 = nco1_out[ndx];
-    
+    mix0 = g_nco0_out[ndx];
+    mix1 = g_nco1_out[ndx];
+
     self->synth_buffer[i] = rx0 * mix0 + rx1 * mix1;
 
     ndx = (ndx + 1) & 3;
