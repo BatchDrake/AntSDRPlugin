@@ -54,6 +54,7 @@ PhasePlotPageConfig::deserialize(Suscan::Object const &conf)
   LOAD(autoSave);
   LOAD(saveDir);
   LOAD(doPlot);
+  LOAD(dipoleSep);
 
   if (saveDir == "")
     saveDir = QDir::currentPath().toStdString();
@@ -78,6 +79,7 @@ PhasePlotPageConfig::serialize()
   STORE(autoSave);
   STORE(saveDir);
   STORE(doPlot);
+  STORE(dipoleSep);
 
   return persist(obj);
 }
@@ -225,6 +227,12 @@ PhasePlotPage::connectAll()
         SIGNAL(horizontalSelectionChanged(qreal, qreal)),
         this,
         SLOT(onHSelection(qreal, qreal)));
+
+  connect(
+        ui->dipoleSepSpin,
+        SIGNAL(valueChanged(double)),
+        this,
+        SLOT(onChangeDipoleSep()));
 }
 
 QString
@@ -312,6 +320,14 @@ PhasePlotPage::cycleAutoSaveFile()
     ui->currentFileLabel->setText("None");
     ui->statusLabel->setText("Idle");
   }
+}
+
+void
+PhasePlotPage::refreshPhaseScale()
+{
+  m_wavelength        = 2.9979246e+08 / ui->freqSpin->value();
+  m_phaseScale        = 2 * M_PI * m_config->dipoleSep / m_wavelength;
+  ui->phaseView->setPhaseScale(m_phaseScale);
 }
 
 void
@@ -431,7 +447,7 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
             if (m_config->angleOfArrival) {
               qreal aoa1, aoa2;
 
-              aoa1 = -SU_ASIN(m_detector->lastPhase() / M_PI);
+              aoa1 = -SU_ASIN(m_detector->lastPhase() / m_phaseScale);
               aoa2 = M_PI - aoa1;
 
               phaseInfoText =
@@ -606,6 +622,7 @@ PhasePlotPage::refreshUi()
   BLOCKSIG(ui->saveDirEdit,            setText(QString::fromStdString(m_config->saveDir)));
   BLOCKSIG(ui->saveBufferCheck,        setChecked(m_config->autoSave));
   BLOCKSIG(ui->phaseOriginSpin,        setValue(m_config->phaseOrigin));
+  BLOCKSIG(ui->dipoleSepSpin,          setValue(m_config->dipoleSep));
 
   ui->phaseView->setAoA(m_config->angleOfArrival);
   ui->gainSpin->setEnabled(!m_config->autoFit);
@@ -716,7 +733,7 @@ PhasePlotPage::refreshMeasurements()
   ui->meanPhaseLabel->setText(
         SuWidgetsHelpers::formatQuantity(SU_RAD2DEG(phase), 4, "º"));
 
-  angle = -SU_ASIN(phase / M_PI);
+  angle = -SU_ASIN(phase / m_phaseScale);
   ui->meanAngle1Label->setText(
         SuWidgetsHelpers::formatQuantity(
           SU_RAD2DEG(angle),
@@ -743,6 +760,7 @@ PhasePlotPage::applyConfig(void)
   m_detector->resize(m_config->measurementTime * m_sampRate);
   m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
 
+  refreshPhaseScale();
   refreshMeasurements();
 }
 
@@ -825,7 +843,7 @@ void
 PhasePlotPage::onAutoScrollToggled()
 {
   m_config->autoScroll = ui->autoScrollButton->isChecked();
-  refreshUi();
+  ui->waveform->setAutoScroll(m_config->autoScroll);
 }
 
 void
@@ -880,6 +898,7 @@ PhasePlotPage::onGainChanged()
 void
 PhasePlotPage::onChangeFrequency()
 {
+  refreshPhaseScale();
   emit frequencyChanged(ui->freqSpin->value());
 }
 
@@ -894,6 +913,13 @@ PhasePlotPage::onChangePhaseOrigin()
 {
   m_config->phaseOrigin = ui->phaseOriginSpin->value();
   m_phaseAdjust = SU_C_EXP(-SU_I * SU_DEG2RAD(m_config->phaseOrigin));
+}
+
+void
+PhasePlotPage::onChangeDipoleSep()
+{
+  m_config->dipoleSep = ui->dipoleSepSpin->value();
+  refreshPhaseScale();
 }
 
 void

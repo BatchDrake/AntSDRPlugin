@@ -41,6 +41,7 @@ namespace SigDigger {
     float  measurementTime    = .2;
     float  coherenceThreshold = 10.;
     double maxAlloc           = 256 * (1 << 20);
+    float  dipoleSep          = 1.1; // meters
     bool   angleOfArrival     = false;
     bool   autoSave           = false;
     std::string saveDir       = "";
@@ -68,7 +69,8 @@ namespace SigDigger {
     SUFLOAT   m_max = 0;
     SUFLOAT   m_gain = 1;
     SUCOMPLEX m_phaseAdjust = 1;
-
+    SUFLOAT   m_wavelength;
+    SUFLOAT   m_phaseScale;
     FILE     *m_autoSaveFp = nullptr;
     SUSCOUNT  m_savedSize  = 0;
 
@@ -90,7 +92,7 @@ namespace SigDigger {
     void connectAll();
     void logText(QString const &);
     void logText(struct timeval const &, QString const &);
-
+    void refreshPhaseScale();
     void showEvent(QShowEvent *) override;
 
   public:
@@ -143,6 +145,7 @@ namespace SigDigger {
     void onChangeFrequency();
     void onChangeBandwidth();
     void onChangePhaseOrigin();
+    void onChangeDipoleSep();
     void onChangeMeasurementTime();
     void onChangeCoherenceThreshold();
     void onLogEnableToggled();
