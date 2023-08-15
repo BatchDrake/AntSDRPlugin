@@ -216,9 +216,6 @@ suscan_source_ad9361_init(
 
   self->samp_rate = config->samp_rate;
 
-  /* I am sure EA4GPZ will love this */
-  su_ncqo_init(&self->mixer, -.5);
-  
   ok = SU_TRUE;
 
 done:
@@ -387,8 +384,11 @@ suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
   const int16_t *data;
   SUSCOUNT samples, i, j;
   SUCOMPLEX rx0, rx1;
-  SUCOMPLEX mix;
+  SUCOMPLEX mix0, mix1;
   int n_read;
+  int ndx = self->nco_ndx;
+  SUCOMPLEX nco0_out[] = {1., -I, -1, +I};
+  SUCOMPLEX nco1_out[] = {1., +I, -1, -I};
 
   n_read = iio_buffer_refill(self->rx_buf);
   if (n_read < 0)
@@ -411,12 +411,15 @@ suscan_source_ad9361_acquire(struct suscan_source_ad9361 *self)
     rx1 = (data[j | 2] + I * data[j | 3]) / 32768.;
 
     /* Just tell me you don't love how these channels are combined */
-    mix = su_ncqo_read(&self->mixer);
-    self->synth_buffer[i] = 
-        rx0 * mix 
-      + rx1 * SU_C_CONJ(mix);
+    mix0 = nco0_out[ndx];
+    mix1 = nco1_out[ndx];
+    
+    self->synth_buffer[i] = rx0 * mix0 + rx1 * mix1;
+
+    ndx = (ndx + 1) & 3;
   }
 
+  self->nco_ndx = ndx;
   self->synth_buffer_size     = samples;
   self->synth_buffer_consumed = 0;
 

@@ -41,7 +41,7 @@ struct suscan_source_ad9361 {
 
   SUBOOL   started;
   SUBOOL   running;
-  su_ncqo_t mixer;
+  int      nco_ndx;
 
   struct iio_context *context;
   struct iio_device  *rx_dev;
