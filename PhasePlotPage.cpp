@@ -443,13 +443,21 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
             QString phaseInfoText;
             timersub(&time, &m_lastEvent, &delta);
             qreal asSeconds = delta.tv_sec + delta.tv_usec * 1e-6;
+            qreal aoa1, aoa2;
+            auto event = m_detector->lastEvent();
+
+            aoa1 = -SU_ASIN(m_detector->lastPhase() / m_phaseScale);
+            aoa2 = M_PI - aoa1;
+
+            // Log in list
+            event.timeStamp = m_lastEvent;
+            event.length    = SCAST(SUFLOAT, asSeconds);
+            event.aoa[0]    = SCAST(SUFLOAT, aoa1);
+            event.aoa[1]    = SCAST(SUFLOAT, aoa2);
+
+            m_eventList.push_back(event);
 
             if (m_config->angleOfArrival) {
-              qreal aoa1, aoa2;
-
-              aoa1 = -SU_ASIN(m_detector->lastPhase() / m_phaseScale);
-              aoa2 = M_PI - aoa1;
-
               phaseInfoText =
                   "AoA = " + SuWidgetsHelpers::formatQuantity(
                     SU_RAD2DEG(aoa1),
@@ -646,6 +654,67 @@ PhasePlotPage::refreshUi()
     ui->waveform->zoomVertical(-limits, +limits);
     ui->phaseView->setGain(m_gain);
   }
+}
+
+bool
+PhasePlotPage::saveLog(QString const &path)
+{
+  bool done = false;
+
+  QFile outfile;
+
+  outfile.setFileName(path);
+  outfile.open(QIODevice::Text | QIODevice::WriteOnly);
+
+  if (!outfile.isOpen()) {
+    QMessageBox::critical(
+          this,
+          "Save event log",
+          "Cannot save event file: " + outfile.errorString());
+  } else {
+    QTextStream out(&outfile);
+    out << ui->logTextEdit->toPlainText() << "\n";
+    done = true;
+  }
+
+  return done;
+}
+
+bool
+PhasePlotPage::saveCSV(QString const &path)
+{
+  bool done = false;
+
+  QFile outfile;
+
+  outfile.setFileName(path);
+  outfile.open(QIODevice::Text | QIODevice::WriteOnly);
+
+  if (!outfile.isOpen()) {
+    QMessageBox::critical(
+          this,
+          "Save event log",
+          "Cannot save event file: " + outfile.errorString());
+  } else {
+    QTextStream out(&outfile);
+
+    for (auto &p : m_eventList) {
+      QString line =
+          QString::number(p.timeStamp.tv_sec) + "," +
+          QString::number(p.timeStamp.tv_usec) + "," +
+          QString::number(SU_RAD2DEG(p.meanPhase), 'e', 7) + "," +
+          QString::number(SU_RAD2DEG(p.rmsPhaseDiff), 'e', 7) + "," +
+          QString::number(SU_RAD2DEG(p.aoa[0]), 'e', 7) + "," +
+          QString::number(SU_RAD2DEG(p.aoa[1]), 'e', 7) + "," +
+          QString::number(SU_POWER_DB_RAW(p.meanPower), 'e', 7) + "," +
+          QString::number(SU_POWER_DB_RAW(p.length), 'e', 7);
+      out << line << "\n";
+    }
+
+    done = true;
+  }
+
+  return done;
 }
 
 void
@@ -955,6 +1024,8 @@ PhasePlotPage::onAoAToggled()
   refreshUi();
 }
 
+#define EVENT_LOG_FILTER_STRING           "Event log (*.log)"
+#define COHERENT_EVENT_LIST_FILTER_STRING "Coherent event list (*.csv)"
 void
 PhasePlotPage::onSaveLog()
 {
@@ -963,34 +1034,26 @@ PhasePlotPage::onSaveLog()
   do {
     QFileDialog dialog(this);
     QStringList filters;
+    QString     selectedFilter;
 
     dialog.setFileMode(QFileDialog::FileMode::AnyFile);
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setWindowTitle(QString("Save event log"));
 
-    filters << "Event log (*.log)"
-            << "All files (*)";
+    filters << EVENT_LOG_FILTER_STRING
+            << COHERENT_EVENT_LIST_FILTER_STRING;
 
     dialog.setNameFilters(filters);
 
     if (dialog.exec()) {
       auto selected = dialog.selectedFiles();
       QString path = selected.first();
-      QFile outfile;
+      QString filter = dialog.selectedNameFilter();
 
-      outfile.setFileName(path);
-      outfile.open(QIODevice::Text | QIODevice::WriteOnly);
-
-      if (!outfile.isOpen()) {
-        QMessageBox::critical(
-              this,
-              "Save event log",
-              "Cannot save event file: " + outfile.errorString());
-      } else {
-        QTextStream out(&outfile);
-        out << ui->logTextEdit->toPlainText() << "\n";
-        done = true;
-      }
+      if (filter == EVENT_LOG_FILTER_STRING)
+        done = saveLog(path);
+      else if (filter == COHERENT_EVENT_LIST_FILTER_STRING)
+        done = saveCSV(path);
     } else {
       done = true;
     }
@@ -1001,6 +1064,8 @@ void
 PhasePlotPage::onClearLog()
 {
   ui->logTextEdit->clear();
+  m_eventList.clear();
+
   m_infoLogged = false;
 }
 

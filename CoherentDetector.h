@@ -34,14 +34,26 @@
 //
 
 namespace SigDigger {
+  struct CoherentEvent {
+    struct timeval timeStamp;
+    SUFLOAT length;
+    SUFLOAT meanPhase;
+    SUFLOAT meanPower;
+    SUFLOAT rmsPhaseDiff;
+    SUFLOAT aoa[2];
+  };
+
   class CoherentDetector
   {
     SUCOMPLEX              m_prev = 1;
     SUCOMPLEX              m_iqAcc = 0;
     SUFLOAT                m_angDeltaAcc = 0;
+    SUFLOAT                m_rmsAcc = 0;
     SUFLOAT                m_powerAcc = 0;
     SUFLOAT                m_lastPower = 0;
     SUFLOAT                m_lastPhase = 0;
+    SUFLOAT                m_diffRMS = 0;
+    struct timeval         m_when;
     size_t                 m_count = 0;
     size_t                 m_size = 0;
     size_t                 m_powerCount = 0;
@@ -61,6 +73,7 @@ namespace SigDigger {
     bool  triggered() const;
     SUFLOAT lastPhase() const;
     SUFLOAT lastPower() const;
+    CoherentEvent lastEvent() const;
     bool  haveEvent() const;
   };
 }

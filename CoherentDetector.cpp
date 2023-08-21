@@ -18,6 +18,7 @@
 //
 
 #include "CoherentDetector.h"
+#include <sys/time.h>
 
 using namespace SigDigger;
 
@@ -57,7 +58,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
 {
   size_t avail, count;
   bool triggered;
-  SUFLOAT ang, accum, power;
+  SUFLOAT ang, accum, power, rmsAcc;
   SUCOMPLEX prev;
   SUCOMPLEX iqAcc;
 
@@ -75,14 +76,16 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
   accum = m_angDeltaAcc;
   power = m_powerAcc;
   iqAcc = m_iqAcc;
+  rmsAcc = m_rmsAcc;
 
   // Demodulate
   for (size_t i = 0; i < size; ++i) {
-    power += SU_C_REAL(data[i] * SU_C_CONJ(data[i]));
-    ang    = SU_C_ARG(data[i] * SU_C_CONJ(prev));
-    accum += ang * ang;
-    prev   = data[i];
-    iqAcc += data[i];
+    power  += SU_C_REAL(data[i] * SU_C_CONJ(data[i]));
+    ang     = SU_C_ARG(data[i] * SU_C_CONJ(prev));
+    accum  += ang * ang;
+    rmsAcc += ang * ang;
+    prev    = data[i];
+    iqAcc  += data[i];
   }
 
   m_prev        = prev;
@@ -93,6 +96,7 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
   if (triggered) {
     m_powerCount += size;
     m_powerAcc    = power;
+    m_rmsAcc      = rmsAcc;
     m_iqAcc       = iqAcc;
   }
 
@@ -103,14 +107,16 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
     if (triggered) {
       if (accum > 4 * m_threshold2) {
         if (m_powerCount > 0) {
-          m_lastPower = m_powerAcc / m_powerCount;
-          m_lastPhase = SU_C_ARG(m_iqAcc);
-          m_haveEvent = true;
+          m_lastPower     = m_powerAcc / m_powerCount;
+          m_diffRMS       = SU_SQRT(m_rmsAcc / m_powerCount); // RMS of mean coherence
+          m_lastPhase     = SU_C_ARG(m_iqAcc);
+          m_haveEvent     = true;
         }
 
         m_powerAcc   = 0;
         m_powerCount = 0;
         m_iqAcc      = 0;
+        m_rmsAcc     = 0;
         m_triggered  = false;
       }
     } else {
@@ -120,17 +126,33 @@ CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
         m_powerCount = size;
         m_haveEvent  = false;
         m_iqAcc      = iqAcc;
+        m_rmsAcc     = rmsAcc;
+        gettimeofday(&m_when, nullptr);
       }
     }
+
     accum = 0;
     count = 0;
   }
 
-  m_angDeltaAcc = accum;
-  m_count       = count;
+  m_angDeltaAcc  = accum;
+  m_count        = count;
 
   return size;
 }
+
+CoherentEvent
+CoherentDetector::lastEvent() const
+{
+  CoherentEvent event;
+
+  event.timeStamp    = m_when;
+  event.rmsPhaseDiff = m_diffRMS;
+  event.meanPower    = m_lastPower;
+  event.meanPhase    = m_lastPhase;
+  return event;
+}
+
 
 bool
 CoherentDetector::triggered() const

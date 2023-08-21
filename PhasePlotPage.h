@@ -21,6 +21,9 @@
 
 #include <TabWidgetFactory.h>
 #include <QShowEvent>
+#include <list>
+
+#include "CoherentDetector.h"
 
 namespace Ui {
   class PhasePlotPage;
@@ -28,7 +31,6 @@ namespace Ui {
 
 namespace SigDigger {
   class PhaseComparator;
-  class CoherentDetector;
 
   class PhasePlotPageConfig : public Suscan::Serializable {
   public:
@@ -62,6 +64,7 @@ namespace SigDigger {
 
     std::vector<SUCOMPLEX> m_data;
     std::vector<SUCOMPLEX> m_empty;
+    std::list<CoherentEvent> m_eventList;
 
     SUFLOAT   m_sampRate;
     SUCOMPLEX m_accumulated;
@@ -94,6 +97,9 @@ namespace SigDigger {
     void logText(struct timeval const &, QString const &);
     void refreshPhaseScale();
     void showEvent(QShowEvent *) override;
+
+    bool saveLog(QString const &);
+    bool saveCSV(QString const &);
 
   public:
     explicit PhasePlotPage(
