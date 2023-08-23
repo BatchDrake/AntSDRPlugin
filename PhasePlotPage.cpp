@@ -796,7 +796,7 @@ PhasePlotPage::refreshMeasurements()
   ui->meanPhaseLabel->setText(
         SuWidgetsHelpers::formatQuantity(SU_RAD2DEG(phase), 4, "º"));
 
-  angle = -SU_ASIN(phase / m_phaseScale);
+  angle = SU_ASIN(phase / m_phaseScale);
   ui->meanAngle1Label->setText(
         SuWidgetsHelpers::formatQuantity(
           SU_RAD2DEG(angle),
