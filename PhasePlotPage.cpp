@@ -327,7 +327,9 @@ PhasePlotPage::refreshPhaseScale()
 {
   m_wavelength        = 2.9979246e+08 / ui->freqSpin->value();
   m_phaseScale        = 2 * M_PI * m_config->dipoleSep / m_wavelength;
+
   ui->phaseView->setPhaseScale(m_phaseScale);
+  m_detector->setDipolePhase(m_phaseScale);
 }
 
 void
@@ -443,36 +445,28 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
             QString phaseInfoText;
             timersub(&time, &m_lastEvent, &delta);
             qreal asSeconds = delta.tv_sec + delta.tv_usec * 1e-6;
-            qreal aoa1, aoa2;
             auto event = m_detector->lastEvent();
-
-            aoa1 = -SU_ASIN(m_detector->lastPhase() / m_phaseScale);
-            aoa2 = M_PI - aoa1;
 
             // Log in list
             event.timeStamp = m_lastEvent;
-            event.length    = SCAST(SUFLOAT, asSeconds);
-            event.aoa[0]    = SCAST(SUFLOAT, aoa1);
-            event.aoa[1]    = SCAST(SUFLOAT, aoa2);
-
             m_eventList.push_back(event);
 
             if (m_config->angleOfArrival) {
               phaseInfoText =
                   "AoA = " + SuWidgetsHelpers::formatQuantity(
-                    SU_RAD2DEG(aoa1),
+                    SU_RAD2DEG(event.aoa[0]),
                     4,
                     "deg",
                     true) +
                   " or " + SuWidgetsHelpers::formatQuantity(
-                    SU_RAD2DEG(aoa2),
+                    SU_RAD2DEG(event.aoa[1]),
                     4,
                     "deg",
                     true);
             } else {
               phaseInfoText =
                   "dPhi = " +SuWidgetsHelpers::formatQuantity(
-                    SU_RAD2DEG(m_detector->lastPhase()),
+                    SU_RAD2DEG(event.meanPhase),
                     4,
                     "º");
             }
@@ -482,7 +476,7 @@ PhasePlotPage::feed(struct timeval const &tv, const SUCOMPLEX *data, SUSCOUNT si
                   "Coherent event end. T = " +
                   SuWidgetsHelpers::formatQuantity(asSeconds, 4, "s") +
                   ", S = " +
-                  QString::number(SU_POWER_DB_RAW(m_detector->lastPower())) +
+                  QString::number(SU_POWER_DB_RAW(event.meanPower)) +
                   " dB, " +
                   phaseInfoText);
           }
@@ -703,11 +697,11 @@ PhasePlotPage::saveCSV(QString const &path)
           QString::number(p.timeStamp.tv_sec) + "," +
           QString::number(p.timeStamp.tv_usec) + "," +
           QString::number(SU_RAD2DEG(p.meanPhase), 'e', 7) + "," +
-          QString::number(SU_RAD2DEG(p.rmsPhaseDiff), 'e', 7) + "," +
+          "0" + "," + // Placeholder for uncertainty (TODO)
           QString::number(SU_RAD2DEG(p.aoa[0]), 'e', 7) + "," +
           QString::number(SU_RAD2DEG(p.aoa[1]), 'e', 7) + "," +
           QString::number(SU_POWER_DB_RAW(p.meanPower), 'e', 7) + "," +
-          QString::number(SU_POWER_DB_RAW(p.length), 'e', 7);
+          QString::number(p.length, 'e', 7);
       out << line << "\n";
     }
 
@@ -827,6 +821,7 @@ PhasePlotPage::applyConfig(void)
 
   m_phaseAdjust = SU_C_EXP(-SU_I * SU_DEG2RAD(m_config->phaseOrigin));
   m_detector->resize(m_config->measurementTime * m_sampRate);
+  m_detector->setHoldMax(m_config->measurementTime * m_sampRate);
   m_detector->setThreshold(SU_DEG2RAD(m_config->coherenceThreshold));
 
   refreshPhaseScale();
@@ -996,6 +991,7 @@ PhasePlotPage::onChangeMeasurementTime()
 {
   m_config->measurementTime = ui->measurementTimeSpin->timeValue();
   m_detector->resize(m_config->measurementTime * m_sampRate);
+  m_detector->setHoldMax(m_config->measurementTime * m_sampRate);
 
   logDetectorInfo();
 }

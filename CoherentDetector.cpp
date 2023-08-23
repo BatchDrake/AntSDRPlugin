@@ -37,14 +37,17 @@ void
 CoherentDetector::reset()
 {
   m_triggered = false;
-  m_count = 0;
-  m_angDeltaAcc = 0.;
+  m_count  = 0;
+  m_iqAcc  = 0;
+  m_pwrAcc = 0;
+  m_prev   = 1;
 }
 
 void
 CoherentDetector::resize(size_t size = 0)
 {
   m_size = size;
+  m_alpha = SU_SPLPF_ALPHA(size);
 }
 
 void
@@ -53,104 +56,91 @@ CoherentDetector::setThreshold(float threshold)
   m_threshold2 = threshold * threshold;
 }
 
+void
+CoherentDetector::setDipolePhase(SUFLOAT phase)
+{
+  m_dipPhase = phase;
+}
+
+void
+CoherentDetector::setHoldMax(size_t hold)
+{
+  m_holdMax = hold;
+}
+
 size_t
 CoherentDetector::feed(const SUCOMPLEX *data, size_t size)
 {
-  size_t avail, count;
-  bool triggered;
-  SUFLOAT ang, accum, power, rmsAcc;
-  SUCOMPLEX prev;
-  SUCOMPLEX iqAcc;
+  size_t i;
 
-  count = m_count;
-  triggered = m_triggered;
-  if (count >= m_size)
-    avail = 0;
-  else
-    avail = m_size - count;
+  SUCOMPLEX iq;
+  SUCOMPLEX prev = m_prev;
+  SUFLOAT   detSig = m_detSig;
+  bool      signaled;
+  SUFLOAT   angle;
+  bool      searching = true;
 
-  if (size > avail)
-    size = avail;
+  for (i = 0; i < size && searching; ++i) {
+    iq = data[i];
 
-  prev  = m_prev;
-  accum = m_angDeltaAcc;
-  power = m_powerAcc;
-  iqAcc = m_iqAcc;
-  rmsAcc = m_rmsAcc;
+    angle = SU_C_ARG(iq * SU_C_CONJ(prev));
+    if (isinf(angle) || isnan(angle))
+      angle = 0;
 
-  // Demodulate
-  for (size_t i = 0; i < size; ++i) {
-    power  += SU_C_REAL(data[i] * SU_C_CONJ(data[i]));
-    ang     = SU_C_ARG(data[i] * SU_C_CONJ(prev));
-    accum  += ang * ang;
-    rmsAcc += ang * ang;
-    prev    = data[i];
-    iqAcc  += data[i];
-  }
+    SU_SPLPF_FEED(detSig, angle * angle, m_alpha);
+    signaled = detSig < m_threshold2;
 
-  m_prev        = prev;
+    if (m_triggered) {
+      // Triggered! Accumulate signal data
+      m_iqAcc  += iq;
+      m_pwrAcc += SU_C_REAL(iq * SU_C_CONJ(iq));
+      ++m_count;
 
-  avail -= size;
-  count += size;
+      if (!signaled) {
+        if (++m_holdCntr > m_holdMax) {
+          // EVENT!
+          m_lastEvent.length    = m_count - m_holdCntr - 1;
+          m_lastEvent.meanPhase = SU_C_ARG(m_iqAcc);
+          m_lastEvent.meanPower = m_pwrAcc / m_count;
 
-  if (triggered) {
-    m_powerCount += size;
-    m_powerAcc    = power;
-    m_rmsAcc      = rmsAcc;
-    m_iqAcc       = iqAcc;
-  }
+          m_lastEvent.aoa[0]    = SU_ASIN(m_lastEvent.meanPhase / m_dipPhase);
+          m_lastEvent.aoa[1]    = M_PI - m_lastEvent.aoa[0];
+          m_haveEvent = true;
 
-  // Detect
-  if (avail == 0) {
-    accum /= count;
-
-    if (triggered) {
-      if (accum > 4 * m_threshold2) {
-        if (m_powerCount > 0) {
-          m_lastPower     = m_powerAcc / m_powerCount;
-          m_diffRMS       = SU_SQRT(m_rmsAcc / m_powerCount); // RMS of mean coherence
-          m_lastPhase     = SU_C_ARG(m_iqAcc);
-          m_haveEvent     = true;
+          m_triggered = false;
+          searching   = false;
         }
-
-        m_powerAcc   = 0;
-        m_powerCount = 0;
-        m_iqAcc      = 0;
-        m_rmsAcc     = 0;
-        m_triggered  = false;
+      } else {
+        // Signal present: reset hold counter
+        m_holdCntr = 0;
       }
     } else {
-      if (accum <= m_threshold2) {
-        m_triggered  = true;
-        m_powerAcc   = power;
-        m_powerCount = size;
-        m_haveEvent  = false;
-        m_iqAcc      = iqAcc;
-        m_rmsAcc     = rmsAcc;
-        gettimeofday(&m_when, nullptr);
+      // Non triggered
+      if (signaled) {
+        // But triggered now
+        gettimeofday(&m_lastEvent.timeStamp, nullptr);
+        m_iqAcc     = iq;
+        m_count     = 1;
+        m_pwrAcc    = SU_C_REAL(iq * SU_C_CONJ(iq));
+        m_holdCntr  = 0;
+        m_triggered = true;
+        searching   = false;
       }
     }
 
-    accum = 0;
-    count = 0;
+    prev = iq;
   }
 
-  m_angDeltaAcc  = accum;
-  m_count        = count;
+  m_prev      = prev;
+  m_detSig    = detSig;
 
-  return size;
+  return i;
 }
 
 CoherentEvent
-CoherentDetector::lastEvent() const
+CoherentDetector::lastEvent()
 {
-  CoherentEvent event;
-
-  event.timeStamp    = m_when;
-  event.rmsPhaseDiff = m_diffRMS;
-  event.meanPower    = m_lastPower;
-  event.meanPhase    = m_lastPhase;
-  return event;
+  return m_lastEvent;
 }
 
 
@@ -158,18 +148,6 @@ bool
 CoherentDetector::triggered() const
 {
   return m_triggered;
-}
-
-SUFLOAT
-CoherentDetector::lastPower() const
-{
-  return m_lastPower;
-}
-
-SUFLOAT
-CoherentDetector::lastPhase() const
-{
-  return m_lastPhase;
 }
 
 bool

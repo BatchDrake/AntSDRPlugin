@@ -36,30 +36,30 @@
 namespace SigDigger {
   struct CoherentEvent {
     struct timeval timeStamp;
-    SUFLOAT length;
-    SUFLOAT meanPhase;
-    SUFLOAT meanPower;
-    SUFLOAT rmsPhaseDiff;
-    SUFLOAT aoa[2];
+    SUSCOUNT length;
+    SUFLOAT  meanPhase;
+    SUFLOAT  meanPower;
+    SUFLOAT  aoa[2];
   };
 
   class CoherentDetector
   {
-    SUCOMPLEX              m_prev = 1;
-    SUCOMPLEX              m_iqAcc = 0;
-    SUFLOAT                m_angDeltaAcc = 0;
-    SUFLOAT                m_rmsAcc = 0;
-    SUFLOAT                m_powerAcc = 0;
-    SUFLOAT                m_lastPower = 0;
-    SUFLOAT                m_lastPhase = 0;
-    SUFLOAT                m_diffRMS = 0;
-    struct timeval         m_when;
-    size_t                 m_count = 0;
-    size_t                 m_size = 0;
-    size_t                 m_powerCount = 0;
-    float                  m_threshold2 = 0;
-    bool                   m_triggered = false;
-    bool                   m_haveEvent = false;
+    SUSCOUNT  m_holdMax    = 0;
+    SUSCOUNT  m_holdCntr   = 0;
+    SUCOMPLEX m_prev       = 1;
+    SUSCOUNT  m_size       = 0;
+    SUFLOAT   m_alpha      = 0;
+    SUFLOAT   m_threshold2 = 0;
+    SUFLOAT   m_detSig     = M_PI * M_PI;
+    SUFLOAT   m_dipPhase   = M_PI;
+
+    bool      m_triggered = false;
+    SUSCOUNT  m_count     = 0;
+    SUCOMPLEX m_iqAcc     = 0;
+    SUFLOAT   m_pwrAcc    = 0;
+    bool      m_haveEvent = false;
+
+    CoherentEvent m_lastEvent;
 
   public:
     CoherentDetector();
@@ -67,13 +67,13 @@ namespace SigDigger {
     bool enabled() const;
     void reset();
     void resize(size_t);
+    void setDipolePhase(SUFLOAT);
+    void setHoldMax(size_t);
     void setThreshold(float); // In radians, always
 
     size_t feed(const SUCOMPLEX *, size_t);
     bool  triggered() const;
-    SUFLOAT lastPhase() const;
-    SUFLOAT lastPower() const;
-    CoherentEvent lastEvent() const;
+    CoherentEvent lastEvent();
     bool  haveEvent() const;
   };
 }
