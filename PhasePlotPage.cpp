@@ -701,7 +701,7 @@ PhasePlotPage::saveCSV(QString const &path)
           QString::number(SU_RAD2DEG(p.aoa[0]), 'e', 7) + "," +
           QString::number(SU_RAD2DEG(p.aoa[1]), 'e', 7) + "," +
           QString::number(SU_POWER_DB_RAW(p.meanPower), 'e', 7) + "," +
-          QString::number(p.length, 'e', 7);
+          QString::number(p.length / m_sampRate, 'e', 7);
       out << line << "\n";
     }
 
