@@ -39,22 +39,32 @@ SOURCES += Registration.cpp \
   AD9361SourcePage.cpp \
   AD9361SourcePageFactory.cpp \
   2rx_ad9361.c \
+  CoherentChannelForwarder.cpp \
   CoherentDetector.cpp \
   PhaseComparator.cpp \
   PhaseComparatorFactory.cpp \
   PhasePlotPage.cpp \
   PhasePlotPageFactory.cpp \
+  Polarimeter.cpp \
+  PolarimeterFactory.cpp \
+  PolarimetryPage.cpp \
+  PolarimetryPageFactory.cpp \
   RawChannelForwarder.cpp \
   SimplePhaseComparator.cpp
 
 HEADERS += 2rx_ad9361.h \
   AD9361SourcePage.h \
   AD9361SourcePageFactory.h \
+  CoherentChannelForwarder.h \
   CoherentDetector.h \
   PhaseComparator.h \
   PhaseComparatorFactory.h \
   PhasePlotPage.h \
   PhasePlotPageFactory.h \
+  Polarimeter.h \
+  PolarimeterFactory.h \
+  PolarimetryPage.h \
+  PolarimetryPageFactory.h \
   RawChannelForwarder.h \
   SimplePhaseComparator.h
 
@@ -68,5 +78,7 @@ CONFIG += c++11
 FORMS += \
   AD9361SourcePage.ui \
   PhaseComparator.ui \
-  PhasePlotPage.ui
+  PhasePlotPage.ui \
+  Polarimeter.ui \
+  PolarimetryPage.ui
 

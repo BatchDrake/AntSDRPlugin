@@ -23,6 +23,8 @@
 #include "AD9361SourcePageFactory.h"
 #include "PhaseComparatorFactory.h"
 #include "PhasePlotPageFactory.h"
+#include "PolarimeterFactory.h"
+#include "PolarimetryPageFactory.h"
 
 #include "2rx_ad9361.h"
 
@@ -51,6 +53,14 @@ plugin_load(Suscan::Plugin *plugin)
 
   if (!sus->registerTabWidgetFactory(
         new SigDigger::PhasePlotPageFactory(plugin)))
+    return false;
+
+  if (!sus->registerToolWidgetFactory(
+        new SigDigger::PolarimeterFactory(plugin)))
+    return false;
+
+  if (!sus->registerTabWidgetFactory(
+        new SigDigger::PolarimetryPageFactory(plugin)))
     return false;
 
   sus->registerDelayedCallback(plugin_delayed_load, plugin);
