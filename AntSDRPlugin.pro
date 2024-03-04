@@ -1,10 +1,12 @@
-QT += core widgets gui
-
 TEMPLATE = lib
 DEFINES += ANTSDRPLUGIN_LIBRARY
 
 CONFIG += c++11
 CONFIG += unversioned_libname unversioned_soname
+
+QT += widgets opengl
+
+greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets
 
 isEmpty(PLUGIN_DIRECTORY) {
   _HOME = $$(HOME)
@@ -72,8 +74,6 @@ INCLUDEPATH += $$SUWIDGETS_INSTALL_HEADERS $$SIGDIGGER_INSTALL_HEADERS
 
 unix: CONFIG += link_pkgconfig
 unix: PKGCONFIG += suscan sigutils fftw3 sndfile libiio libad9361
-
-CONFIG += c++11
 
 FORMS += \
   AD9361SourcePage.ui \
