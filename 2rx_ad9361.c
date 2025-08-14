@@ -222,12 +222,12 @@ done:
   return ok;
 }
 
-static struct suscan_source_gain_desc g_ad9361_pga_desc = {
-  .name = "PGA",
-  .def  = 0,
-  .min  = 0,
-  .max  = 73,
-  .step = 1
+static struct suscan_source_gain_info g_ad9361_pga_info = {
+  .name  = "PGA",
+  .value = 0,
+  .min   = 0,
+  .max   = 73,
+  .step  = 1
 };
 
 SUPRIVATE SUBOOL suscan_source_ad9361_set_gain(
@@ -245,7 +245,6 @@ suscan_source_ad9361_init_info(
   struct suscan_source_info *info)
 {
   struct suscan_source_gain_info *ginfo = NULL;
-  struct suscan_source_gain_value gain;
   int ret;
   double gain1, gain2;
   char *dup = NULL;
@@ -287,14 +286,14 @@ suscan_source_ad9361_init_info(
     return SU_FALSE;
   }
 
-  gain.desc = &g_ad9361_pga_desc;
-  gain.val  = .5 * (gain1 + gain2);
+  SU_TRY(
+    suscan_source_ad9361_set_gain(
+      self,
+      g_ad9361_pga_info.name,
+      g_ad9361_pga_info.value));
 
-  SU_TRY(suscan_source_ad9361_set_gain(self, g_ad9361_pga_desc.name, gain.val));
-
-  SU_TRY(ginfo = suscan_source_gain_info_new(&gain));
+  SU_TRY(ginfo = suscan_source_gain_info_dup(&g_ad9361_pga_info));
   SU_TRYC(PTR_LIST_APPEND_CHECK(info->gain, ginfo));
-
   ginfo = NULL;
 
   /* Add antenna */
@@ -561,6 +560,7 @@ suscan_source_ad9361_get_freq_limits(
 SUPRIVATE struct suscan_source_interface g_ad9361_source =
 {
   .name            = "ad9361",
+  .analyzer        = "local",
   .desc            = "Pluto/ANTSDR 2RX combined source",
   .realtime        = SU_TRUE,
 

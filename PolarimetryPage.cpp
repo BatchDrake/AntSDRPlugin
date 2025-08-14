@@ -170,6 +170,8 @@ PolarimetryPage::connectAll()
         SLOT(onAntennaChanged()));
 }
 
+// Just unused (for now)
+#if 0
 static void
 setElidedLabelText(QLabel *label, QString text)
 {
@@ -178,6 +180,7 @@ setElidedLabelText(QLabel *label, QString text)
     QString clippedText = metrix.elidedText(text, Qt::ElideMiddle, width);
     label->setText(clippedText);
 }
+#endif
 
 void
 PolarimetryPage::updateGain()
@@ -266,7 +269,7 @@ PolarimetryPage::adjustVSamp(const SUCOMPLEX *v, size_t size)
 
 void
 PolarimetryPage::feed(
-    struct timeval const &tv,
+    struct timeval const &,
     const SUCOMPLEX *hSamp,
     const SUCOMPLEX *vSamp,
     SUSCOUNT size)
